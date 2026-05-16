@@ -1885,6 +1885,47 @@ function TreeRow({ node, depth }: { node: TreeNode; depth: number }): JSX.Elemen
   );
 }
 
+function BulletList({ items }: { items: string[] }): JSX.Element {
+  return (
+    <ul
+      style={{
+        listStyle: "none",
+        margin: 0,
+        padding: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {items.map((item) => (
+        <li
+          key={item}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "12px 1fr",
+            columnGap: 8,
+            alignItems: "start",
+            lineHeight: 1.5,
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              color: "#6b7280",
+              fontSize: 16,
+              lineHeight: 1.3,
+              userSelect: "none",
+            }}
+          >
+            •
+          </span>
+          <Text size="small">{item}</Text>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function NodeTypeBar({ c }: { c: Customer }): JSX.Element {
   const theme = useHostTheme();
   const total = c.structural + c.mixed + c.leafWithDevices + c.deadEnd;
@@ -2155,40 +2196,26 @@ function CustomerDetail({
       <Card>
         <CardHeader>What's distinctive about this customer</CardHeader>
         <CardBody>
-          <Grid columns={2} gap={16}>
-            <Stack gap={6}>
+          <Grid columns={2} gap={20}>
+            <Stack gap={8}>
               <Text size="small" weight="semibold">
                 Use cases &amp; structural intent
               </Text>
-              <Stack gap={4}>
-                {c.useCases.map((u) => (
-                  <Text key={u} size="small">
-                    · {u}
-                  </Text>
-                ))}
-              </Stack>
+              <BulletList items={c.useCases} />
             </Stack>
-            <Stack gap={6}>
+            <Stack gap={8}>
               <Text size="small" weight="semibold">
                 Observations
               </Text>
-              <Stack gap={4}>
-                {c.observations.map((o) => (
-                  <Text key={o} size="small" tone="secondary">
-                    – {o}
-                  </Text>
-                ))}
-              </Stack>
+              <BulletList items={c.observations} />
             </Stack>
           </Grid>
           {classification ? (
-            <Stack gap={4} style={{ marginTop: 12 }}>
+            <Stack gap={6} style={{ marginTop: 16 }}>
               <Text size="small" weight="semibold">
                 Naming shape note
               </Text>
-              <Text size="small" tone="secondary">
-                {classification.shapeNote}
-              </Text>
+              <Text size="small">{classification.shapeNote}</Text>
             </Stack>
           ) : null}
         </CardBody>
