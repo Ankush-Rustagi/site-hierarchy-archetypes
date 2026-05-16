@@ -1670,6 +1670,15 @@ function TooltipStyles(): JSX.Element {
       gap: 4px;
       white-space: nowrap;
     }
+    /* When a column header tooltip is open, lift its cell above sibling
+       cells so neighbouring th/td backgrounds don't paint over the overflowing
+       tooltip. Same rule for body cells in case a tooltip lives in <td>. */
+    th:has(.vk-info-anchor:hover),
+    th:has(.vk-info-anchor:focus-visible),
+    td:has(.vk-info-anchor:hover),
+    td:has(.vk-info-anchor:focus-visible) {
+      z-index: 50 !important;
+    }
   `;
   return <style>{css}</style>;
 }
