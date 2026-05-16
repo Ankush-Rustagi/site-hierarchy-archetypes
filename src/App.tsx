@@ -1857,8 +1857,6 @@ function TreeRow({ node, depth }: { node: TreeNode; depth: number }): JSX.Elemen
         paddingLeft: indent + 20,
         paddingTop: 4,
         paddingBottom: 4,
-        borderLeft: `1px solid ${theme.stroke.tertiary}`,
-        marginLeft: indent,
       }}
     >
       <Row gap={8} align="center" justify="space-between">
@@ -2806,12 +2804,67 @@ const WhatWeLearnedSection = (): JSX.Element => {
   );
 };
 
-const CustomerComparisonTable = (): JSX.Element => {
+function AccountLink({
+  name,
+  rank,
+  onPick,
+}: {
+  name: string;
+  rank: number;
+  onPick?: (rank: number) => void;
+}): JSX.Element {
+  if (!onPick) {
+    return (
+      <Text weight="semibold" size="small">
+        {name}
+      </Text>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(rank)}
+      title={`Open ${name} detail`}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        font: "inherit",
+        color: "#93c5fd",
+        textAlign: "left",
+        fontSize: 13,
+        fontWeight: 600,
+        textDecoration: "underline",
+        textDecorationColor: "rgba(147, 197, 253, 0.4)",
+        textUnderlineOffset: 3,
+      }}
+      onMouseOver={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.color = "#bfdbfe";
+        (e.currentTarget as HTMLButtonElement).style.textDecorationColor =
+          "#bfdbfe";
+      }}
+      onMouseOut={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
+        (e.currentTarget as HTMLButtonElement).style.textDecorationColor =
+          "rgba(147, 197, 253, 0.4)";
+      }}
+    >
+      {name}
+    </button>
+  );
+}
+
+const CustomerComparisonTable = ({
+  onPickCustomer,
+}: {
+  onPickCustomer?: (rank: number) => void;
+} = {}): JSX.Element => {
   return (
     <Table
       headers={[
         <ColHead label="#" tooltip="Where this customer ranks in this analysis. #1 is the most complex." />,
-        <ColHead label="Account" tooltip="Customer name." />,
+        <ColHead label="Account" tooltip="Customer name. Click to open this customer's detail view." />,
         <ColHead label="Industry" tooltip="Customer's industry." />,
         <ColHead label="Archetype" tooltip="The family of hierarchy pattern this customer uses. Matched colors across the canvas group customers in the same family together." />,
         <ColHead label="Sites" tooltip="Total number of sites in this customer's account." />,
@@ -2843,6 +2896,40 @@ const CustomerComparisonTable = (): JSX.Element => {
         "right",
         "right",
       ]}
+      colMinWidth={[
+        40,
+        260,
+        180,
+        170,
+        60,
+        80,
+        60,
+        80,
+        80,
+        60,
+        60,
+        80,
+        80,
+        50,
+        70,
+      ]}
+      colNoWrap={[
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]}
       rows={customers.map((c) => {
         const num = (n: number | string): JSX.Element => (
           <Text size="small" style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -2851,9 +2938,7 @@ const CustomerComparisonTable = (): JSX.Element => {
         );
         return [
           num(c.rank),
-          <Text weight="semibold" size="small">
-            {c.name}
-          </Text>,
+          <AccountLink name={c.name} rank={c.rank} onPick={onPickCustomer} />,
           <Text size="small" tone="secondary">
             {c.industry}
           </Text>,
@@ -3132,6 +3217,11 @@ const ViewSwitcher = ({
 };
 
 const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element => {
+  const [, setActiveRank] = useCanvasState<number>("activeCustomerRank", 1);
+  const pickCustomer = (rank: number) => {
+    setActiveRank(rank);
+    setView("detail");
+  };
   return (
     <Stack gap={24}>
       <Callout tone="info" title="How to read this canvas">
@@ -3153,9 +3243,10 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
           column (next to Industry) is the synthesized family this customer
           belongs to — we'll unpack what that means in the next section.
         </Text>
-        <CustomerComparisonTable />
+        <CustomerComparisonTable onPickCustomer={pickCustomer} />
         <Text size="small" tone="secondary">
-          Hover any column header for a quick explanation.
+          Click any customer name to jump to that customer's detail view. Hover
+          any column header for a quick explanation.
         </Text>
       </Stack>
 
@@ -3349,7 +3440,7 @@ export default function App(): JSX.Element {
         padding: "32px 24px 64px",
       }}
     >
-      <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1440, margin: "0 auto" }}>
         <MultiProductSiteHierarchyArchetypes />
       </div>
     </div>

@@ -70,6 +70,9 @@ export function useHostTheme(): Theme {
 // -----------------------------------------------------------------
 
 const STATE_PREFIX = "site-hierarchy:";
+const STATE_EVENT = "canvas-state-change";
+
+type StateChangeDetail = { key: string; value: unknown };
 
 export function useCanvasState<T>(
   key: string,
@@ -88,19 +91,35 @@ export function useCanvasState<T>(
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(value));
-    } catch {
-      // Ignore storage errors (quota, private mode, etc.)
-    }
-  }, [storageKey, value]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<StateChangeDetail>).detail;
+      if (!detail || detail.key !== key) return;
+      setValue(detail.value as T);
+    };
+    window.addEventListener(STATE_EVENT, handler);
+    return () => window.removeEventListener(STATE_EVENT, handler);
+  }, [key]);
 
   const setter = useCallback(
     (next: T | ((prev: T) => T)) =>
-      setValue((prev) =>
-        typeof next === "function" ? (next as (p: T) => T)(prev) : next,
-      ),
-    [],
+      setValue((prev) => {
+        const resolved =
+          typeof next === "function" ? (next as (p: T) => T)(prev) : next;
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem(storageKey, JSON.stringify(resolved));
+          } catch {
+            // Ignore storage errors (quota, private mode, etc.)
+          }
+          window.dispatchEvent(
+            new CustomEvent<StateChangeDetail>(STATE_EVENT, {
+              detail: { key, value: resolved },
+            }),
+          );
+        }
+        return resolved;
+      }),
+    [key, storageKey],
   );
 
   return [value, setter];
@@ -704,11 +723,20 @@ type TableProps = {
   headers: ReactNode[];
   rows: ReactNode[][];
   columnAlign?: ColumnAlign[];
+  colMinWidth?: (number | undefined)[];
+  colNoWrap?: boolean[];
 };
 
-export function Table({ headers, rows, columnAlign }: TableProps) {
+export function Table({
+  headers,
+  rows,
+  columnAlign,
+  colMinWidth,
+  colNoWrap,
+}: TableProps) {
   const align = (i: number): ColumnAlign =>
     columnAlign?.[i] ?? "left";
+  const nowrap = (i: number): boolean => colNoWrap?.[i] === true;
   return (
     <div
       className="vk-scroll"
@@ -726,6 +754,19 @@ export function Table({ headers, rows, columnAlign }: TableProps) {
           fontSize: 13,
         }}
       >
+        {colMinWidth ? (
+          <colgroup>
+            {headers.map((_, i) => {
+              const w = colMinWidth[i];
+              return (
+                <col
+                  key={i}
+                  style={w ? { minWidth: w, width: w } : undefined}
+                />
+              );
+            })}
+          </colgroup>
+        ) : null}
         <thead>
           <tr
             style={{
@@ -774,6 +815,7 @@ export function Table({ headers, rows, columnAlign }: TableProps) {
                     verticalAlign: "top",
                     textAlign: align(ci),
                     color: DARK_THEME.text.secondary,
+                    whiteSpace: nowrap(ci) ? "nowrap" : undefined,
                   }}
                 >
                   {cell}
