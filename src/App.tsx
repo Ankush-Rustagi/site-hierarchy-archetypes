@@ -2896,8 +2896,9 @@ const CustomerComparisonTable = ({
         "right",
         "right",
       ]}
+      stickyLeftCount={2}
       colMinWidth={[
-        40,
+        44,
         260,
         180,
         170,

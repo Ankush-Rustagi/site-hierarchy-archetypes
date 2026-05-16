@@ -725,6 +725,12 @@ type TableProps = {
   columnAlign?: ColumnAlign[];
   colMinWidth?: (number | undefined)[];
   colNoWrap?: boolean[];
+  /**
+   * Number of leftmost columns to pin (sticky) when the table scrolls
+   * horizontally. Each pinned column must have an entry in colMinWidth so we
+   * know how far to offset later pinned columns.
+   */
+  stickyLeftCount?: number;
 };
 
 export function Table({
@@ -733,10 +739,28 @@ export function Table({
   columnAlign,
   colMinWidth,
   colNoWrap,
+  stickyLeftCount = 0,
 }: TableProps) {
   const align = (i: number): ColumnAlign =>
     columnAlign?.[i] ?? "left";
   const nowrap = (i: number): boolean => colNoWrap?.[i] === true;
+
+  // Compute cumulative left offsets for pinned columns
+  const stickyOffsets: number[] = [];
+  if (stickyLeftCount > 0 && colMinWidth) {
+    let acc = 0;
+    for (let i = 0; i < stickyLeftCount; i++) {
+      stickyOffsets.push(acc);
+      acc += colMinWidth[i] ?? 0;
+    }
+  }
+  const isSticky = (ci: number) => ci < stickyLeftCount;
+  // Background colors that pinned cells need to paint themselves with so
+  // scrolled content does not show through. Match the row's zebra color.
+  const evenRowBg = DARK_THEME.bg.elevated;
+  const oddRowBg = "#171f30"; // slightly lighter than evenRowBg, equivalent to rgba(148,163,184,0.04) atop bg.elevated
+  const headerBg = DARK_THEME.bg.subtle;
+
   return (
     <div
       className="vk-scroll"
@@ -750,7 +774,8 @@ export function Table({
       <table
         style={{
           width: "100%",
-          borderCollapse: "collapse",
+          borderCollapse: "separate",
+          borderSpacing: 0,
           fontSize: 13,
         }}
       >
@@ -770,59 +795,77 @@ export function Table({
         <thead>
           <tr
             style={{
-              background: DARK_THEME.bg.subtle,
-              borderBottom: `2px solid ${DARK_THEME.stroke.primary}`,
+              background: headerBg,
             }}
           >
-            {headers.map((h, i) => (
-              <th
-                key={i}
-                style={{
-                  textAlign: align(i),
-                  padding: "10px 12px",
-                  fontWeight: 700,
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  color: DARK_THEME.text.primary,
-                  whiteSpace: "nowrap",
-                  position: "relative",
-                }}
-              >
-                {h}
-              </th>
-            ))}
+            {headers.map((h, i) => {
+              const sticky = isSticky(i);
+              return (
+                <th
+                  key={i}
+                  style={{
+                    textAlign: align(i),
+                    padding: "10px 12px",
+                    fontWeight: 700,
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    color: DARK_THEME.text.primary,
+                    whiteSpace: "nowrap",
+                    position: sticky ? "sticky" : "relative",
+                    left: sticky ? stickyOffsets[i] : undefined,
+                    zIndex: sticky ? 3 : 2,
+                    background: headerBg,
+                    borderBottom: `2px solid ${DARK_THEME.stroke.primary}`,
+                    borderRight:
+                      sticky && i === stickyLeftCount - 1
+                        ? `1px solid ${DARK_THEME.stroke.primary}`
+                        : undefined,
+                  }}
+                >
+                  {h}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, ri) => (
-            <tr
-              key={ri}
-              style={{
-                background:
-                  ri % 2 === 0 ? "transparent" : "rgba(148, 163, 184, 0.04)",
-                borderTop:
-                  ri === 0
-                    ? "none"
-                    : `1px solid ${DARK_THEME.stroke.tertiary}`,
-              }}
-            >
-              {r.map((cell, ci) => (
-                <td
-                  key={ci}
-                  style={{
-                    padding: "8px 12px",
-                    verticalAlign: "top",
-                    textAlign: align(ci),
-                    color: DARK_THEME.text.secondary,
-                    whiteSpace: nowrap(ci) ? "nowrap" : undefined,
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((r, ri) => {
+            const rowBg = ri % 2 === 0 ? evenRowBg : oddRowBg;
+            return (
+              <tr key={ri} style={{ background: rowBg }}>
+                {r.map((cell, ci) => {
+                  const sticky = isSticky(ci);
+                  return (
+                    <td
+                      key={ci}
+                      style={{
+                        padding: "8px 12px",
+                        verticalAlign: "top",
+                        textAlign: align(ci),
+                        color: DARK_THEME.text.secondary,
+                        whiteSpace: nowrap(ci) ? "nowrap" : undefined,
+                        background: sticky ? rowBg : undefined,
+                        position: sticky ? "sticky" : undefined,
+                        left: sticky ? stickyOffsets[ci] : undefined,
+                        zIndex: sticky ? 1 : undefined,
+                        borderTop:
+                          ri === 0
+                            ? "none"
+                            : `1px solid ${DARK_THEME.stroke.tertiary}`,
+                        borderRight:
+                          sticky && ci === stickyLeftCount - 1
+                            ? `1px solid ${DARK_THEME.stroke.primary}`
+                            : undefined,
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
