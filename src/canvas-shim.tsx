@@ -4,6 +4,7 @@
 
 import {
   CSSProperties,
+  MouseEvent as ReactMouseEvent,
   ReactNode,
   useCallback,
   useEffect,
@@ -267,10 +268,48 @@ export function H2({ children, id }: HeadingProps) {
         lineHeight: 1.25,
         color: DARK_THEME.text.primary,
         margin: 0,
+        scrollMarginTop: 24,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
       }}
     >
-      {children}
+      <span>{children}</span>
+      {id ? <AnchorLink targetId={id} /> : null}
     </h2>
+  );
+}
+
+function AnchorLink({ targetId }: { targetId: string }) {
+  const onClick = (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (typeof window !== "undefined" && window.history) {
+      window.history.replaceState(null, "", `#${targetId}`);
+    }
+  };
+  return (
+    <a
+      href={`#${targetId}`}
+      onClick={onClick}
+      aria-label="Copy link to this section"
+      title="Copy a direct link to this section"
+      className="vk-anchor"
+      style={{
+        color: "#6b7280",
+        fontSize: 16,
+        textDecoration: "none",
+        lineHeight: 1,
+        padding: "2px 6px",
+        borderRadius: 4,
+        opacity: 0.65,
+      }}
+    >
+      #
+    </a>
   );
 }
 

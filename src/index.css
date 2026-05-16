@@ -8,6 +8,27 @@ body,
   height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.vk-anchor:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: #93c5fd !important;
+  opacity: 1 !important;
+}
+
+.vk-anchor:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
 body {
   font-family:
     system-ui,

@@ -20,8 +20,18 @@ import {
   useCanvasState,
   useHostTheme,
 } from "./canvas-shim";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { JSX, ReactNode } from "react";
+
+const OVERVIEW_HASHES = new Set([
+  "customers-at-a-glance",
+  "what-we-measured",
+  "root-shapes",
+  "archetype-families",
+  "what-we-learned",
+  "method",
+]);
+const DETAIL_HASHES = new Set(["customer-deep-dives"]);
 
 type ProductMix =
   | "cameras_only"
@@ -2119,7 +2129,7 @@ function CustomerDetail({
       {/* HEADER: name + meta pills + archetype on one row each */}
       <Stack gap={8}>
         <Row gap={10} align="center" wrap>
-          <H2>{c.name}</H2>
+          <H2 id={`customer-${c.rank}`}>{c.name}</H2>
           <Pill size="sm" tone="neutral">
             {c.industry}
           </Pill>
@@ -2319,7 +2329,7 @@ function CustomerTabs(): JSX.Element {
   return (
     <Stack gap={16}>
       <Stack gap={8}>
-        <H2>Customer deep-dives</H2>
+        <H2 id="customer-deep-dives">Customer deep-dives</H2>
         <Text tone="secondary" size="small">
           Each tab shows one customer's emblematic subtree (the root that best
           illustrates their structural pattern), grouped scope and device
@@ -2588,15 +2598,40 @@ const RootShapeAnalysis = (): JSX.Element => {
             <YesNoPill value={r.lifecycleMarkers} />,
           ])}
         />
-        <Stack gap={6}>
-          {frequencyClassification.map((r) => (
-            <Text key={r.customer} size="small" tone="secondary">
-              <Text as="span" weight="semibold" size="small">
-                {r.customer}:
-              </Text>{" "}
-              {r.shapeNote}
-            </Text>
-          ))}
+        <Stack gap={8}>
+          <Text size="small" tone="secondary">
+            Per-customer notes on how each one names its top-level groups.
+            Same data as the table above, with the chips inline next to the
+            description so you can scan one customer at a time.
+          </Text>
+          <Grid columns={2} gap={10}>
+            {frequencyClassification.map((r) => (
+              <div
+                key={r.customer}
+                style={{
+                  background: "#111827",
+                  border: "1px solid #374151",
+                  borderRadius: 8,
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <Row gap={6} align="center" wrap>
+                  <Text size="small" weight="semibold">
+                    {r.customer}
+                  </Text>
+                  {r.rootShapes.map((s) => (
+                    <ShapeChip key={s} shape={s} />
+                  ))}
+                </Row>
+                <Text size="small" tone="secondary">
+                  {r.shapeNote}
+                </Text>
+              </div>
+            ))}
+          </Grid>
         </Stack>
       </Stack>
     </Stack>
@@ -3217,6 +3252,105 @@ const ViewSwitcher = ({
   );
 };
 
+function scrollToSection(targetId: string): void {
+  const el = document.getElementById(targetId);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (typeof window !== "undefined" && window.history) {
+    window.history.replaceState(null, "", `#${targetId}`);
+  }
+}
+
+function SectionJumpButton({
+  targetId,
+  label,
+}: {
+  targetId: string;
+  label: string;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={() => scrollToSection(targetId)}
+      title={`Scroll to the ${label.replace(/\s*→$/, "")} section`}
+      style={{
+        background: "rgba(59, 130, 246, 0.12)",
+        border: "1px solid rgba(59, 130, 246, 0.5)",
+        borderRadius: 6,
+        color: "#93c5fd",
+        padding: "6px 12px",
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: "pointer",
+        font: "inherit",
+        whiteSpace: "nowrap",
+      }}
+      onMouseOver={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background =
+          "rgba(59, 130, 246, 0.22)";
+        (e.currentTarget as HTMLButtonElement).style.color = "#bfdbfe";
+      }}
+      onMouseOut={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background =
+          "rgba(59, 130, 246, 0.12)";
+        (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+const TOC_ENTRIES: { id: string; label: string }[] = [
+  { id: "customers-at-a-glance", label: "1. Customers at a glance" },
+  { id: "what-we-measured", label: "2. What we measured" },
+  { id: "root-shapes", label: "3. Root shapes" },
+  { id: "archetype-families", label: "4. Archetype families" },
+  { id: "what-we-learned", label: "5. What we learned" },
+  { id: "method", label: "Method" },
+];
+
+function TableOfContents(): JSX.Element {
+  return (
+    <Stack gap={6}>
+      <Text size="small" weight="semibold" tone="secondary">
+        JUMP TO
+      </Text>
+      <Row gap={6} wrap>
+        {TOC_ENTRIES.map((e) => (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => scrollToSection(e.id)}
+            title={`Scroll to ${e.label}`}
+            style={{
+              background: "rgba(59, 130, 246, 0.08)",
+              border: "1px solid rgba(59, 130, 246, 0.4)",
+              borderRadius: 999,
+              color: "#bfdbfe",
+              padding: "3px 10px",
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+              font: "inherit",
+              whiteSpace: "nowrap",
+            }}
+            onMouseOver={(ev) => {
+              (ev.currentTarget as HTMLButtonElement).style.background =
+                "rgba(59, 130, 246, 0.2)";
+            }}
+            onMouseOut={(ev) => {
+              (ev.currentTarget as HTMLButtonElement).style.background =
+                "rgba(59, 130, 246, 0.08)";
+            }}
+          >
+            {e.label}
+          </button>
+        ))}
+      </Row>
+    </Stack>
+  );
+}
+
 const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element => {
   const [, setActiveRank] = useCanvasState<number>("activeCustomerRank", 1);
   const pickCustomer = (rank: number) => {
@@ -3226,18 +3360,32 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
   return (
     <Stack gap={24}>
       <Callout tone="info" title="How to read this canvas">
-        Twelve complex multi-product customer hierarchies were sampled. The page
-        moves from <Text as="span" weight="semibold">the raw data</Text>, to
-        the two <Text as="span" weight="semibold">layers of pattern</Text> we
-        classified inside it (root shape and archetype family), to the
-        consolidated <Text as="span" weight="semibold">findings</Text>.
-        Selection criteria for the 12 are at the bottom under Method.
+        <Stack gap={10}>
+          <Text size="small">
+            Twelve complex multi-product customer hierarchies were sampled.
+            The page moves from{" "}
+            <Text as="span" weight="semibold" size="small">
+              the raw data
+            </Text>
+            , to the two{" "}
+            <Text as="span" weight="semibold" size="small">
+              layers of pattern
+            </Text>{" "}
+            we classified inside it (root shape and archetype family), to the
+            consolidated{" "}
+            <Text as="span" weight="semibold" size="small">
+              findings
+            </Text>
+            . Selection criteria for the 12 are at the bottom under Method.
+          </Text>
+          <TableOfContents />
+        </Stack>
       </Callout>
 
       <Divider />
 
       <Stack gap={10}>
-        <H2>1. The twelve customers at a glance</H2>
+        <H2 id="customers-at-a-glance">1. The twelve customers at a glance</H2>
         <Text tone="secondary" size="small">
           Source data for everything below. Each row is one customer's
           hierarchy summarized into counts. The <Text as="span" weight="semibold">Archetype</Text>{" "}
@@ -3249,12 +3397,18 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
           Click any customer name to jump to that customer's detail view. Hover
           any column header for a quick explanation.
         </Text>
+        <Row gap={10} align="center" wrap>
+          <Text size="small" tone="secondary">
+            Want to know what those archetype pills actually mean?
+          </Text>
+          <SectionJumpButton targetId="archetype-families" label="Jump to archetype families →" />
+        </Row>
       </Stack>
 
       <Divider />
 
       <Stack gap={10}>
-        <H2>2. What we measured</H2>
+        <H2 id="what-we-measured">2. What we measured</H2>
         <Text tone="secondary" size="small">
           Customers organize their hierarchies along two complementary axes.
           The next two sections walk through each one.
@@ -3289,7 +3443,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
 
       <Stack gap={16}>
         <Stack gap={6}>
-          <H2>3. Layer 1 — Root shapes</H2>
+          <H2 id="root-shapes">3. Layer 1 — Root shapes</H2>
           <Text size="small" tone="secondary">
             What customers literally type at the top of their hierarchy. Each
             chip color in this section corresponds to one naming style; the
@@ -3303,7 +3457,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
 
       <Stack gap={16}>
         <Stack gap={6}>
-          <H2>4. Layer 2 — Archetype families</H2>
+          <H2 id="archetype-families">4. Layer 2 — Archetype families</H2>
           <Text size="small" tone="secondary">
             What the full tree is doing once you read past depth 1. Seven
             families emerge from the twelve customers. The four counts below
@@ -3318,7 +3472,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
       <Divider />
 
       <Stack gap={10}>
-        <H2>5. What we learned</H2>
+        <H2 id="what-we-learned">5. What we learned</H2>
         <Text tone="secondary" size="small">
           Eight patterns that repeat across the twelve customers. Each one is
           a concrete example with the product implication.
@@ -3329,7 +3483,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
       <Divider />
 
       <Stack gap={10}>
-        <H2>Method &amp; caveats</H2>
+        <H2 id="method">Method &amp; caveats</H2>
         <Stack gap={6}>
           <Text size="small">
             Filters applied (in order): paid customer orgs only (
@@ -3415,6 +3569,35 @@ const DetailSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element =
 
 function MultiProductSiteHierarchyArchetypes(): JSX.Element {
   const [view, setView] = useCanvasState<View>("currentView", "overview");
+  const [, setActiveRank] = useCanvasState<number>("activeCustomerRank", 1);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleHash = () => {
+      const raw = window.location.hash.replace(/^#/, "");
+      if (!raw) return;
+      let targetView: View | null = null;
+      let targetCustomerRank: number | null = null;
+      const customerMatch = raw.match(/^customer-(\d+)$/);
+      if (customerMatch) {
+        targetView = "detail";
+        targetCustomerRank = parseInt(customerMatch[1], 10);
+      } else if (OVERVIEW_HASHES.has(raw)) {
+        targetView = "overview";
+      } else if (DETAIL_HASHES.has(raw)) {
+        targetView = "detail";
+      }
+      if (targetView) setView(targetView);
+      if (targetCustomerRank) setActiveRank(targetCustomerRank);
+      window.requestAnimationFrame(() => {
+        const el = document.getElementById(raw);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, [setView, setActiveRank]);
 
   return (
     <Stack gap={20}>
