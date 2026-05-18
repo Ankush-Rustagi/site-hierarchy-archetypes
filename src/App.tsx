@@ -136,6 +136,7 @@ type Customer = {
   rootNames: string[];
   exampleBranches: { kind: string; path: string; mix: ProductMix }[];
   observations: string[];
+  keyTakeaways: string[];
   subtreeRationale: string;
   subtree: TreeNode[];
 };
@@ -197,6 +198,11 @@ const customers: Customer[] = [
       "Only top-12 account hitting all six product_mix values",
       "Naming is inconsistent (GA-Athens vs GA_Bogart) — two operators or two onboarding eras",
       "32 dead-end leaves likely staging sites or relocated buildings",
+    ],
+    keyTakeaways: [
+      "Hitting all six product mixes is the upper bound of cross-sell maturity; Cat is the model account for a 'every product, every site' story. The 'six product mixes' badge is a meaningful sales artifact.",
+      "Naming inconsistency (GA-Athens vs GA_Bogart) at this size = two operators or two onboarding eras. Bulk-rename / naming-convention enforcement tooling would resolve operational drift that lives forever in the tree otherwise.",
+      "Function-first sub-orgs (CAT Robotics, CAT Switch Gear) sitting alongside geographic-state roots is the canonical 'geographic + function hybrid' shape; the product needs to support both axes simultaneously, not force one.",
     ],
     subtreeRationale:
       "IL-Decatur is the only Caterpillar root showing the full STATE > CITY > ADDRESS > INTERIOR > ZONE pattern with all four node types and a mixed-device branch at depth 4.",
@@ -292,6 +298,11 @@ const customers: Customer[] = [
       "Airport-style 5-letter facility codes signal an in-house naming standard",
       "Alarm device volume (166) is unusually high vs alarm panels (3) — sensor-heavy deployment",
       "21 mixed nodes = parent buildings with their own cameras AND interior sub-zones",
+    ],
+    keyTakeaways: [
+      "5-letter facility codes (FLLAK, GAMAC) reveal that logistics customers have a corporate facility taxonomy that pre-dates Verkada. Letting them attach their facility-code as a stable external ID would simplify integrations with WMS / ERP systems.",
+      "Sensor-heavy alarm pattern (166 devices : 3 panels) is the logistics signature; UX should optimize for high-density sensor maps (occupancy, door-prop, motion) rather than camera-grid first.",
+      "Mixed buildings with both perimeter cameras and interior sub-zones are the dominant warehouse pattern; reports that roll up perimeter coverage + interior zone coverage as two separable metrics would match how facilities teams think.",
     ],
     subtreeRationale:
       "FLLAK (Lakeland HQ campus) is the only Saddle Creek root that reaches depth 4 with the canonical perimeter > gate > internal-zone pattern plus alarm-heavy interior buildings.",
@@ -390,6 +401,11 @@ const customers: Customer[] = [
       "82 root-level schools is the widest top-level fan-out in the set",
       "Highest alarm panel count (55) and AC count (249) — strongest security stack adoption",
       "38 dead-end leaves suggest decommissioned sub-zones or 'overflow' staging sites",
+    ],
+    keyTakeaways: [
+      "82 top-level schools is the canonical school-district fan-out; default UI is single-school focused. A 'district view' with cross-school rollups (open doors after-hours, alarm patterns, attendance vs. coverage) is the right shape for this segment.",
+      "Districts adopt the full security stack (cameras + AC + alarms) more aggressively than any other vertical. This is the strongest cross-sell anchor in the set; the K-12 motion should lead with the multi-product story, not cameras alone.",
+      "Old-building vs. new-building patterns ('Birney Old Building' branches) reflect facility-renovation cycles. A 'parent school -> phase / building era' axis would let districts compare deployment generations.",
     ],
     subtreeRationale:
       "Tacoma is mostly flat at the school level, so three representative roots (an elementary, the deepest high school, and a second high school with the alarm-test sub-site) cover the full range without redundancy.",
@@ -490,6 +506,11 @@ const customers: Customer[] = [
       "Only 4 top-level nodes — most function-tight hierarchy in the set",
       "Cameras (309) < alarm devices (287) and AC (144) — government access/alarm bias is real",
       "All constituency-office leaf names follow a CO.<RIDING>.<NAME>.<SPACE> convention",
+    ],
+    keyTakeaways: [
+      "Government / public-admin orgs lead with access and alarms (287 alarm devices, 144 AC, 309 cameras). This is the opposite mix from commercial; AC and Alarms onboarding flows shouldn't assume cameras as the entry point for this segment.",
+      "Function-first organization (Caucus / Precinct / Residences / Constituency Offices) with strong delimiter conventions (CO.RIDING.NAME.SPACE) signals that customers want structured naming templates enforced at create-time, not by convention.",
+      "Only 4 top-level nodes plus deep functional branches points to permissioning by function ('Constituency-office staff see only CO.* sites') as a likely workflow; role inheritance down a function branch matters more than down a geographic branch here.",
     ],
     subtreeRationale:
       "Three of the four function roots (CAUCUS OFFICES, PRECINCT, RESIDENCES) plus one drilled CONSTITUENCY OFFICES branch show the full functional taxonomy and the coded sub-naming pattern.",
@@ -599,6 +620,11 @@ const customers: Customer[] = [
       "Specialty labs are encoded as parenthetical suffixes — works for naming, not for filtering",
       "54 of 65 sites are flat leaves — only the big labs subdivide",
     ],
+    keyTakeaways: [
+      "Customers restate the parent path in the leaf name (3x 'US - NJ - Fairfield CRS') because breadcrumbs aren't visible in the contexts they care about (exports, alerts, links). Surfacing full path in those surfaces would let names stay short.",
+      "Specialty-lab parenthetical suffixes ('(291 Fairfield Ave)', '(Crop Sciences Lab)') are de-facto site attributes. A 'site attribute' or 'site type' tag would let them filter by lab capability across regions, not just within a parent.",
+      "83% of sites flat-leaf even in a complex deep-dive org is the signal that complex doesn't mean deep everywhere. Different sites in the same org need different shapes; we shouldn't optimize navigation only for the deep branches.",
+    ],
     subtreeRationale:
       "SGS is overwhelmingly flat — 54 of 65 sites have no children. The few multi-node sites (NJ-Fairfield CRS, TX-Deer Park, GA-Suwanee) illustrate the rare deep pattern; the rest are leaves.",
     subtree: [
@@ -685,6 +711,11 @@ const customers: Customer[] = [
       "Smallest in the set (36 sites) but hits all six product mixes — efficient hierarchy",
       "Zero structural-only nodes — every parent has devices itself",
       "Building IDs encoded in parens (101, 400, 801) — implies a master facilities-management map",
+    ],
+    keyTakeaways: [
+      "Hitting all six product mixes in 36 sites is the efficiency benchmark; small complex orgs prove multi-product breadth doesn't require scale. Marketing the 'small but full-stack' story unlocks SMB cross-sell.",
+      "Parenthetical building IDs (101, 400, 801) reference an external facilities-management map. Customers want their CMMS / facilities IDs to be first-class metadata on the site, not encoded in names.",
+      "Zero structural-only nodes (every parent carries devices) is the 'mixed-only' clean shape; reporting that distinguishes 'pure browse parent' from 'parent with own coverage' would help these customers understand their own tree.",
     ],
     subtreeRationale:
       "The Hanna Center campus root contains the full building-level pattern — every parent has its own devices plus children, the canonical 'mixed-only' org shape.",
@@ -782,6 +813,11 @@ const customers: Customer[] = [
       "Has explicit 'Staged' and 'Newly Added Devices' root nodes — workflow-driven",
       "'GH Main HE Panel' as a root is a device-specific site — naming violates the geographic pattern",
       "PAC = Performing Arts Center treated as its own campus",
+    ],
+    keyTakeaways: [
+      "Top-level 'Staged' and 'Newly Added Devices' roots are explicit workflow primitives the product doesn't offer. A formal device-onboarding inbox would replace ad-hoc roots that pollute geographic reports.",
+      "Single-campus schools are the canonical site-hierarchy buyer for K-12 standalone; multi-building-with-floors is the dominant pattern. A 'campus template' (Main building / classrooms / gym / specialty) at site creation would accelerate setup.",
+      "Device-specific root nodes ('GH Main HE Panel') indicate a missing primitive for monitoring critical infrastructure (head-end equipment, networking) outside the geographic tree. A 'system / infrastructure' axis would resolve this.",
     ],
     subtreeRationale:
       "Two campuses (East and South) show the full building > floor pattern with all four node types; the East campus shows the deepest path and South shows the alarm-equipped variant.",
@@ -889,6 +925,11 @@ const customers: Customer[] = [
       "Naming convention is deliberately self-explanatory at every level (avoids acronym debt)",
       "Z-prefix is a tombstoning convention — moves obsolete sites to the bottom of alphabetical sort",
       "Almost zero alarm/AC adoption despite huge scale — cameras-only champion",
+    ],
+    keyTakeaways: [
+      "Depth-7 is the existence proof that command structures can be very deep; performance budgets for tree expansion, breadcrumbs, and role inheritance need to be built for the long tail, not the median.",
+      "'Z-prefix tombstoning' is a workaround for missing archive primitives. Customers will not actually delete sites (legal, retention, footage). They need a soft-archive that hides sites from default views but keeps them queryable.",
+      "Cameras-only at enterprise scale is the most common high-bookings shape; the AC/Alarms cross-sell story is asymmetric. Knowing which deep-command orgs ARE buying multi-product helps target the next set of conversations.",
     ],
     subtreeRationale:
       "The ARC Retail Region 01 branch reaches the org's full depth-7 chain (the only place this depth appears), and the Cascade + Del Oro Division branches show the parallel geographic-command structure.",
@@ -1015,6 +1056,11 @@ const customers: Customer[] = [
       "'! - CSUSA' root uses ASCII sort trick to pin at top",
       "Future-state sites ('NSOT 2026 - To be Installed') reveal planning lives in the tree",
     ],
+    keyTakeaways: [
+      "ASCII-sort hacks ('! - CSUSA' to pin at top) reveal a missing primitive: customers want pinning and explicit ordering for top-level navigation. Default alphabetical sort fails the moment an org has a 'this is HQ' branch.",
+      "Mid-migration orgs (old flat school-code roots side-by-side with newer 'Red Apple > Schools > Florida' branches) are common. Reorg / bulk-move tooling for sites would let these customers finish the migration instead of leaving both shapes in place.",
+      "Future-state sites ('NSOT 2026 - To be Installed') prove planning happens in the live tree. A formal lifecycle (planned -> staged -> live -> archived) would clean reports and make rollouts measurable.",
+    ],
     subtreeRationale:
       "Two roots side-by-side: a flat 'FL - SCLA (8751)' school-code site from the old onboarding, plus the Red Apple Education > Schools > Florida corporate branch showing the newer pattern.",
     subtree: [
@@ -1121,6 +1167,11 @@ const customers: Customer[] = [
       "Equipment-level naming ('Wulftec' is a packaging-machine brand) — going below room granularity",
       "28 dead-end empty leaves suggest a habit of creating sites pre-deployment",
     ],
+    keyTakeaways: [
+      "Duplicate-team onboarding is a real failure mode: 'Atl Spark Office' vs 'Atlanta Spark Office' is two parallel teams that didn't see each other's work. A duplicate-detection nudge during site creation would catch this.",
+      "Below-room granularity (named equipment, packaging machines) shows that some customers want to attach devices to physical assets, not just rooms. A 'site -> asset -> device' model would map cleaner than forcing assets into the site tree.",
+      "28 dead-end empty leaves indicate teams pre-stage sites before deployment. A first-class 'planned/staging' state on sites would avoid polluting reports with empty branches.",
+    ],
     subtreeRationale:
       "Southwire Florence is the only root that reaches the org's max depth-5 with all four node types and equipment-level naming (Wulftec is a machine brand) under shipping zones.",
     subtree: [
@@ -1221,6 +1272,11 @@ const customers: Customer[] = [
       "96 top-level plants reflects a flat-then-deep pattern: roots = plants, depth comes from production lines",
       "Production-line granularity is unusual — typically used for incident attribution / per-line monitoring",
     ],
+    keyTakeaways: [
+      "Customers are stuffing 4-dimensional metadata (city, brand, division, facility-type) into a single name string because there are no native tags. First-party tagging or custom-attribute support would unlock this and let teams filter by brand or facility-type cross-cut.",
+      "Production-line granularity is a strong signal that operational-incident reporting (per-line uptime, per-line camera coverage) is a real workflow we should support directly, not just camera-by-camera.",
+      "Flat-then-deep shape (96 wide roots, depth in the production lines below) is a common manufacturing pattern; navigation and search should optimize for picking a plant first, then drilling, rather than treating depth uniformly.",
+    ],
     subtreeRationale:
       "Belvidere is the canonical DFA pattern: encoded-string plant name, Production > Production Lines hierarchy reaching depth 4 with per-line camera leaves.",
     subtree: [
@@ -1314,6 +1370,11 @@ const customers: Customer[] = [
       "80 structural nodes is the highest in the set — most of the tree exists only for browsing",
       "Sparse device coverage (322 cameras across 156 sites = 2 cameras/site avg) — mostly office check-ins",
       "Two-letter state codes as roots is the cleanest single-pattern convention seen",
+    ],
+    keyTakeaways: [
+      "Structure-heavy orgs need a 'browse vs. monitor' mode split: 80 of 156 nodes have no devices, so default views that surface only device-bearing leaves would cut the navigation surface in half.",
+      "Two-letter state-code roots beg for a built-in geographic grouping primitive; users are encoding it in names because the product doesn't model it.",
+      "Sparse-coverage clinics (2 cameras/site avg) signal a long-tail use case where alert tuning and clip retention defaults matter more than dashboard density.",
     ],
     subtreeRationale:
       "AZ shows the canonical state > city > clinic > department pattern. Adjacent dead-end states (AR) and corporate specialty roots (HRC) illustrate the structural overhead.",
@@ -2306,10 +2367,6 @@ function CustomerDetail({
   c: Customer;
   onPickCustomer: (rank: number) => void;
 }): JSX.Element {
-  const subtreeNodeCount = c.subtree.reduce(
-    (sum, n) => sum + 1 + countDescendants(n),
-    0,
-  );
   const classification = getCustomerClassification(c.name);
 
   return (
@@ -2371,6 +2428,17 @@ function CustomerDetail({
         </CardBody>
       </Card>
 
+      <Card>
+        <CardHeader>Key takeaways for product</CardHeader>
+        <CardBody>
+          <Text size="small" tone="secondary" style={{ marginBottom: 12 }}>
+            What this customer's site structure implies for how Command should
+            evolve. Read these as testable hypotheses, not verdicts.
+          </Text>
+          <BulletList items={c.keyTakeaways} />
+        </CardBody>
+      </Card>
+
       {/* STATS: grouped into Scope and Devices with section labels */}
       <Stack gap={6}>
         <Text size="small" weight="semibold" tone="secondary">
@@ -2409,29 +2477,6 @@ function CustomerDetail({
       </Stack>
 
       <Divider />
-
-      {/* EMBLEMATIC SUBTREE: rationale moved into the card, no separate legend (it's above) */}
-      <Stack gap={10}>
-        <H3>
-          Emblematic subtree ({subtreeNodeCount} nodes shown of {c.totalSites})
-        </H3>
-        <Text size="small" tone="secondary">
-          {c.subtreeRationale}
-        </Text>
-        <Card>
-          <CardBody>
-            <Stack gap={2}>
-              {c.subtree.map((n, i) => (
-                <TreeRow key={`${n.name}-${i}`} node={n} depth={0} />
-              ))}
-            </Stack>
-          </CardBody>
-        </Card>
-        <Text size="small" tone="secondary">
-          Click any chevron to collapse a subtree. Number in parentheses after a
-          name is its descendant count.
-        </Text>
-      </Stack>
 
       <RepresentativeSubtrees customerName={c.name} totalSites={c.totalSites} />
 
@@ -4285,88 +4330,427 @@ const ComplexByBookingsTable = (): JSX.Element => {
 };
 
 // ---------------------------------------------------------------------------
-// Complex tail by industry: archetype distribution + modal archetype.
+// Industry featured cards (taxonomy.json driven).
+// Replaces the older Complex-tail-by-industry table with a richer card layout
+// covering the top 8 industries (by combined orgs + bookings rank) plus an
+// explicit "industries not covered" callout for the remaining six.
 
-const ComplexByIndustryTable = (): JSX.Element => {
-  const rows = aggregateSnapshot.complexTail.industryRollup;
+type DistinctiveSubCode = {
+  sub: string;
+  share: number;
+  vsOverallRatio: number;
+};
+
+type SubIndustry = {
+  industry: string;
+  populationOrgs: number;
+  populationBookings: number;
+  populationOpenPipelineValue: number;
+  populationShare?: { orgs: number; bookings: number; pipeline: number };
+  complexOrgs: number;
+  totalNodes?: number;
+};
+
+type FeaturedCard = {
+  cardId: string;
+  cardKind: string;
+  members: string[];
+  description: string;
+  rankByOrgs: number;
+  rankByBookings: number;
+  combinedRank: number;
+  populationOrgs: number;
+  populationBookings: number;
+  populationOpenPipelineValue: number;
+  populationShare: { orgs: number; bookings: number; pipeline: number };
+  complexOrgs: number;
+  totalNodes?: number;
+  distinctiveSubCodes: DistinctiveSubCode[];
+  subIndustries?: SubIndustry[];
+};
+
+type IndustryExampleChild = {
+  name: string;
+  depth: number;
+  parentId?: string;
+  nodeType?: string;
+  cameras?: number;
+  acPanels?: number;
+  alarmDevices?: number;
+  alarmPanels?: number;
+  topShape?: string;
+  subCode?: string;
+};
+
+type IndustryExampleRoot = {
+  rootName: string;
+  rootDepth: number;
+  rootDeviceTotal?: number;
+  children: IndustryExampleChild[];
+};
+
+type IndustryExample = {
+  sfdcAccountId: string;
+  sfdcAccountName: string;
+  industry: string;
+  subSegment?: string;
+  bookings: number;
+  totalSites: number;
+  maxDepth: number;
+  depth1Composition?: unknown;
+  distinctiveSubCodes?: DistinctiveSubCode[];
+  representativeRoots: IndustryExampleRoot[];
+};
+
+const subCodeLabelsLookup: Record<string, string> =
+  (taxonomySnapshot as unknown as { subCodeLabels?: Record<string, string> })
+    .subCodeLabels ?? {};
+
+const prettySubCode = (sub: string): string =>
+  subCodeLabelsLookup[sub] ??
+  sub.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+const exampleNodeMix = (n: IndustryExampleChild): ProductMix => {
+  const total =
+    (n.cameras || 0) +
+    (n.acPanels || 0) +
+    (n.alarmDevices || 0) +
+    (n.alarmPanels || 0);
+  if (total === 0) return "empty";
+  const hasCam = (n.cameras || 0) > 0;
+  const hasAcc = (n.acPanels || 0) > 0;
+  const hasAlm = (n.alarmDevices || 0) + (n.alarmPanels || 0) > 0;
+  if (hasCam && hasAcc && hasAlm) return "cameras_access_alarms";
+  if (hasCam && hasAcc) return "cameras_access";
+  if (hasCam && hasAlm) return "cameras_alarms";
+  if (hasCam) return "cameras_only";
+  return "access_or_alarms_only";
+};
+
+// Renders the flat array of representative-root children (already in depth
+// order) as an indented tree. Adapter for the taxonomy.json example shape.
+function ExampleSubtree({
+  rootName,
+  rootDepth,
+  children,
+}: {
+  rootName: string;
+  rootDepth: number;
+  children: IndustryExampleChild[];
+}): JSX.Element {
   return (
-    <Table
-      headers={[
-        <PopColHead key="ind" label="Industry" />,
-        <PopColHead key="orgs" label="Complex orgs" />,
-        <PopColHead key="bk" label="Bookings" />,
-        <PopColHead key="share" label="Share of complex bookings" />,
-        <PopColHead key="modal" label="Most common archetype" />,
-        <PopColHead key="modalShare" label="Top-archetype share" tooltip="What share of complex orgs in this industry use the most common archetype. (Mode-of-distribution share.)" />,
-        <PopColHead key="ent" label="Mix evenness" tooltip="How evenly the industry's complex orgs are spread across different archetypes. Higher = many archetypes share the industry; lower = one or two archetypes dominate. (Shannon entropy of the archetype distribution, in bits.)" />,
-        <PopColHead key="multi" label="Mixed-shape rate" tooltip="Share of orgs in this slice that use 3+ different naming conventions for their top-level sites. (Multi-archetype rate.)" />,
-        <PopColHead key="medSites" label="Typical site count" tooltip="Typical number of sites for a complex org in this industry. (Median of total_sites across complex orgs in the industry.)" />,
-        <PopColHead key="medDepth" label="Typical site tree depth" tooltip="Typical hierarchy depth for a complex org in this industry. (Median of max_depth across complex orgs in the industry.)" />,
-      ]}
-      columnAlign={["left", "right", "right", "right", "left", "right", "right", "right", "right", "right"]}
-      colMinWidth={[180, 90, 100, 150, 200, 90, 80, 110, 100, 100]}
-      rows={rows.map((r) => [
-        <Text key={`n-${r.industry}`} size="small" weight="semibold">{r.industry}</Text>,
-        <Text key={`o-${r.industry}`} size="small">{r.orgs.toLocaleString()}</Text>,
-        <Text key={`bk-${r.industry}`} size="small">{fmtMoney(r.bookings)}</Text>,
-        <Text key={`bs-${r.industry}`} size="small">{fmtPct(r.bookingsShareOfComplex, 1)}</Text>,
-        <Pill key={`p-${r.industry}`} size="sm" tone={archetypeFamilyTone[r.modalArchetype as ArchetypeFamily]}>
-          {archetypeFamilyLabels[r.modalArchetype as ArchetypeFamily]}
-        </Pill>,
-        <Text key={`ms-${r.industry}`} size="small">{fmtPct(r.modalShare, 0)}</Text>,
-        <Text key={`e-${r.industry}`} size="small">{r.entropy.toFixed(2)}</Text>,
-        <Text key={`m-${r.industry}`} size="small">{fmtPct(r.multiArchetypeRate, 0)}</Text>,
-        <Text key={`s-${r.industry}`} size="small">{r.medianSites.toLocaleString()}</Text>,
-        <Text key={`d-${r.industry}`} size="small">{r.medianMaxDepth.toString()}</Text>,
-      ])}
-    />
+    <Stack gap={2}>
+      <Row gap={6} align="center">
+        <Text size="small" weight="semibold">{rootName}</Text>
+        <Text size="small" tone="secondary">
+          (root, depth {rootDepth}, {children.length} descendants shown)
+        </Text>
+      </Row>
+      {children.map((n, i) => {
+        const indent = Math.max(0, n.depth - rootDepth - 1);
+        return (
+          <Row key={`${n.name}-${i}`} gap={6} align="center">
+            <span style={{ display: "inline-block", width: indent * 14 }} />
+            <Text size="small" tone="secondary">└</Text>
+            <Text size="small">{n.name}</Text>
+            {n.subCode ? (
+              <Pill size="sm" tone="neutral">{prettySubCode(n.subCode)}</Pill>
+            ) : null}
+            <MixPill mix={exampleNodeMix(n)} />
+          </Row>
+        );
+      })}
+    </Stack>
+  );
+}
+
+function FeaturedIndustryCard({ card }: { card: FeaturedCard }): JSX.Element {
+  // Pull up to 2 example customers across this card's member sub-industries.
+  // Each member can have an example list keyed by sub-industry name.
+  const examples: IndustryExample[] = [];
+  for (const member of card.members) {
+    const memberExamples =
+      (
+        taxonomySnapshot.examplesByIndustry as unknown as Record<
+          string,
+          IndustryExample[]
+        >
+      )[member] ?? [];
+    for (const ex of memberExamples) {
+      if (examples.length >= 2) break;
+      examples.push(ex);
+    }
+    if (examples.length >= 2) break;
+  }
+
+  const memberSummary = (card.subIndustries ?? [])
+    .slice()
+    .sort((a, b) => b.populationOrgs - a.populationOrgs);
+
+  return (
+    <Card>
+      <CardHeader>{card.cardId}</CardHeader>
+      <CardBody>
+        <Stack gap={14}>
+          {/* Top stats row */}
+          <Grid columns={3} gap={12}>
+            <Stat
+              value={card.populationOrgs.toLocaleString()}
+              label="Command orgs"
+            />
+            <Stat
+              value={fmtMoney(card.populationBookings)}
+              label="Lifetime bookings"
+            />
+            <Stat
+              value={fmtMoney(card.populationOpenPipelineValue)}
+              label="Open pipeline"
+            />
+          </Grid>
+
+          <Text size="small" tone="secondary">
+            {fmtPct(card.populationShare.orgs, 1)} of paid orgs ·{" "}
+            {fmtPct(card.populationShare.bookings, 1)} of lifetime bookings ·{" "}
+            {card.complexOrgs.toLocaleString()} complex-tail orgs
+          </Text>
+
+          <Text size="small">{card.description}</Text>
+
+          {/* Sub-industries */}
+          {memberSummary.length > 1 ? (
+            <Stack gap={6}>
+              <Text size="small" weight="semibold">
+                Sub-industries inside this group
+              </Text>
+              <Stack gap={4}>
+                {memberSummary.map((sub: SubIndustry) => (
+                  <Row key={sub.industry} gap={8} align="center" wrap>
+                    <Text size="small" weight="semibold">
+                      {sub.industry}
+                    </Text>
+                    <Text size="small" tone="secondary">
+                      {sub.populationOrgs.toLocaleString()} orgs ·{" "}
+                      {fmtMoney(sub.populationBookings)} bookings ·{" "}
+                      {sub.complexOrgs.toLocaleString()} complex
+                    </Text>
+                  </Row>
+                ))}
+              </Stack>
+            </Stack>
+          ) : null}
+
+          {/* Distinctive naming conventions */}
+          {card.distinctiveSubCodes.length > 0 ? (
+            <Stack gap={6}>
+              <Text size="small" weight="semibold">
+                Distinctive naming conventions
+              </Text>
+              <Text size="small" tone="secondary">
+                Sub-codes this industry uses more than the overall base. Higher
+                ratio means more concentrated here.
+              </Text>
+              <Row gap={6} wrap>
+                {card.distinctiveSubCodes.slice(0, 5).map(
+                  (sc: DistinctiveSubCode) => (
+                    <Pill
+                      key={sc.sub}
+                      size="sm"
+                      tone="neutral"
+                      title={`${fmtPct(sc.share, 1)} of nodes in this industry. ${sc.vsOverallRatio.toFixed(2)}x vs overall.`}
+                    >
+                      {prettySubCode(sc.sub)} ({sc.vsOverallRatio.toFixed(1)}x)
+                    </Pill>
+                  ),
+                )}
+              </Row>
+            </Stack>
+          ) : null}
+
+          {/* Example customer trees */}
+          {examples.length > 0 ? (
+            <Stack gap={8}>
+              <Text size="small" weight="semibold">
+                Example customer site structures
+              </Text>
+              {examples.map((ex) => (
+                <Card key={ex.sfdcAccountId}>
+                  <CardBody>
+                    <Stack gap={8}>
+                      <Row gap={8} align="center" wrap>
+                        <Text size="small" weight="semibold">
+                          {ex.sfdcAccountName}
+                        </Text>
+                        <Pill size="sm" tone="neutral">{ex.industry}</Pill>
+                        {ex.subSegment ? (
+                          <Pill size="sm" tone="neutral" variant="outline">
+                            {ex.subSegment}
+                          </Pill>
+                        ) : null}
+                        <Text size="small" tone="secondary">
+                          {ex.totalSites.toLocaleString()} sites · depth{" "}
+                          {ex.maxDepth} · {fmtMoney(ex.bookings)} bookings
+                        </Text>
+                      </Row>
+                      {ex.representativeRoots.slice(0, 1).map((r, i) => (
+                        <ExampleSubtree
+                          key={`${ex.sfdcAccountId}-${i}`}
+                          rootName={r.rootName}
+                          rootDepth={r.rootDepth}
+                          children={r.children}
+                        />
+                      ))}
+                    </Stack>
+                  </CardBody>
+                </Card>
+              ))}
+            </Stack>
+          ) : null}
+        </Stack>
+      </CardBody>
+    </Card>
+  );
+}
+
+const IndustryFeaturedCards = (): JSX.Element => {
+  const featured = (taxonomySnapshot.featuredCards as unknown as FeaturedCard[])
+    .slice()
+    .sort((a, b) => a.combinedRank - b.combinedRank);
+  const notCovered = taxonomySnapshot.notCoveredCards
+    .slice()
+    .sort((a, b) => b.bookings - a.bookings);
+  const notTotals = taxonomySnapshot.notCoveredTotals;
+
+  return (
+    <Stack gap={20}>
+      <Grid columns={2} gap={20}>
+        {featured.map((card) => (
+          <FeaturedIndustryCard key={card.cardId} card={card} />
+        ))}
+      </Grid>
+
+      <Card>
+        <CardHeader>Industries not covered above</CardHeader>
+        <CardBody>
+          <Stack gap={10}>
+            <Text size="small" tone="secondary">
+              {notTotals.cards} smaller industries together account for{" "}
+              {fmtPct(notTotals.shareOfOrgs, 1)} of paid orgs and{" "}
+              {fmtPct(notTotals.shareOfBookings, 1)} of lifetime bookings.
+              Listed below in descending bookings order.
+            </Text>
+            <Stack gap={4}>
+              {notCovered.map((nc) => (
+                <Row key={nc.cardId} gap={8} align="center" wrap>
+                  <Text size="small" weight="semibold">{nc.cardId}</Text>
+                  <Text size="small" tone="secondary">
+                    {nc.orgs.toLocaleString()} orgs ({fmtPct(nc.shareOfOrgs, 1)}{" "}
+                    of paid base) · {fmtMoney(nc.bookings)} bookings (
+                    {fmtPct(nc.shareOfBookings, 1)} of base)
+                  </Text>
+                </Row>
+              ))}
+            </Stack>
+          </Stack>
+        </CardBody>
+      </Card>
+    </Stack>
   );
 };
 
 // ---------------------------------------------------------------------------
-// Industry x bookings band matrix (complex tail only).
+// Bookings-tier industry cards (replacement for the industry x bookings matrix).
+// One card per bookings band, listing the top industries inside the band by
+// bookings, with the most common archetype for each.
 
-const ComplexMatrixTable = (): JSX.Element => {
-  const matrix = aggregateSnapshot.complexTail.industryByBookingBand
-    .filter((c) => c.orgs >= 5)
-    .slice()
-    .sort((a, b) => b.bookings - a.bookings)
-    .slice(0, 60);
+const BookingsTierIndustryCards = (): JSX.Element => {
+  type Cell = (typeof aggregateSnapshot.complexTail.industryByBookingBand)[number];
+  const bands = aggregateSnapshot.complexTail.byBookingBand.slice();
+  // Group cells by band, drop low-sample (<5 orgs).
+  const byBand = new Map<string, Cell[]>();
+  for (const c of aggregateSnapshot.complexTail.industryByBookingBand) {
+    if (c.orgs < 5) continue;
+    if (!byBand.has(c.bandLabel)) byBand.set(c.bandLabel, []);
+    byBand.get(c.bandLabel)!.push(c);
+  }
+  // Render highest band first, since that's where strategic interest lives.
+  const orderedBands = bands.slice().reverse();
+
   return (
-    <Stack gap={6}>
-      <Text size="small" tone="secondary">
-        Top 60 cells by bookings inside the complex tail. Cells with under
-        5 orgs are hidden for sample-size reasons.
-      </Text>
-      <Table
-        headers={[
-          <PopColHead key="ind" label="Industry" />,
-          <PopColHead key="band" label="Bookings band" />,
-          <PopColHead key="orgs" label="Orgs" />,
-          <PopColHead key="bk" label="Bookings" />,
-          <PopColHead key="modal" label="Most common archetype" />,
-          <PopColHead key="ms" label="Top-archetype share" />,
-          <PopColHead key="multi" label="Mixed-shape rate" tooltip="Share of orgs in this slice that use 3+ different naming conventions for their top-level sites. (Multi-archetype rate.)" />,
-          <PopColHead key="depth" label="Typical site tree depth" tooltip="Typical hierarchy depth for an org in this (industry, bookings) cell. (Median of max_depth across the cell.)" />,
-        ]}
-        columnAlign={["left", "left", "right", "right", "left", "right", "right", "right"]}
-        colMinWidth={[170, 110, 70, 100, 200, 90, 110, 110]}
-        rows={matrix.map((c, i) => [
-          <Text key={`i-${i}`} size="small">{c.industry}</Text>,
-          <Text key={`b-${i}`} size="small">{c.bandLabel}</Text>,
-          <Text key={`o-${i}`} size="small">{c.orgs.toLocaleString()}</Text>,
-          <Text key={`bk-${i}`} size="small">{fmtMoney(c.bookings)}</Text>,
-          c.modalArchetype ? (
-            <Pill key={`m-${i}`} size="sm" tone={archetypeFamilyTone[c.modalArchetype as ArchetypeFamily]}>
-              {archetypeFamilyLabels[c.modalArchetype as ArchetypeFamily]}
-            </Pill>
-          ) : <Text key={`m-${i}`} size="small" tone="secondary">—</Text>,
-          <Text key={`ms-${i}`} size="small">{fmtPct(c.modalShare, 0)}</Text>,
-          <Text key={`mr-${i}`} size="small">{fmtPct(c.multiArchetypeRate, 0)}</Text>,
-          <Text key={`d-${i}`} size="small">{c.medianMaxDepth.toString()}</Text>,
-        ])}
-      />
-    </Stack>
+    <Grid columns={2} gap={16}>
+      {orderedBands.map((band) => {
+        const cells = (byBand.get(band.bandLabel) ?? [])
+          .slice()
+          .sort((a, b) => b.bookings - a.bookings)
+          .slice(0, 5);
+        return (
+          <Card key={band.band}>
+            <CardHeader>{band.bandLabel}</CardHeader>
+            <CardBody>
+              <Stack gap={12}>
+                <Grid columns={3} gap={10}>
+                  <Stat
+                    value={band.orgs.toLocaleString()}
+                    label="Complex orgs in band"
+                  />
+                  <Stat
+                    value={fmtMoney(band.bookings)}
+                    label="Band bookings"
+                  />
+                  <Stat
+                    value={fmtPct(band.bookingsShareOfComplex, 0)}
+                    label="Of complex bookings"
+                  />
+                </Grid>
+                {cells.length === 0 ? (
+                  <Text size="small" tone="secondary">
+                    No industries with 5+ complex orgs in this band.
+                  </Text>
+                ) : (
+                  <Stack gap={6}>
+                    <Text size="small" weight="semibold">
+                      Top industries in this band
+                    </Text>
+                    {cells.map((c) => (
+                      <Row
+                        key={`${band.band}-${c.industry}`}
+                        gap={8}
+                        align="center"
+                        wrap
+                      >
+                        <Text size="small" weight="semibold">
+                          {c.industry}
+                        </Text>
+                        <Text size="small" tone="secondary">
+                          {c.orgs.toLocaleString()} orgs ·{" "}
+                          {fmtMoney(c.bookings)}
+                        </Text>
+                        {c.modalArchetype ? (
+                          <Pill
+                            size="sm"
+                            tone={
+                              archetypeFamilyTone[
+                                c.modalArchetype as ArchetypeFamily
+                              ]
+                            }
+                          >
+                            {
+                              archetypeFamilyLabels[
+                                c.modalArchetype as ArchetypeFamily
+                              ]
+                            }{" "}
+                            ({fmtPct(c.modalShare, 0)})
+                          </Pill>
+                        ) : null}
+                      </Row>
+                    ))}
+                  </Stack>
+                )}
+              </Stack>
+            </CardBody>
+          </Card>
+        );
+      })}
+    </Grid>
   );
 };
 
@@ -4501,25 +4885,27 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Divider />
 
       <Stack gap={10}>
-        <H2 id="complex-by-industry">4. Complex tail by industry</H2>
+        <H2 id="complex-by-industry">4. Industry deep-dives</H2>
         <Text size="small" tone="secondary">
-          Industries ranked by bookings inside the complex tail. The
-          &quot;most common archetype&quot; and &quot;mix evenness&quot;
-          columns answer &quot;does this industry have a single dominant
-          hierarchy pattern or is the mix all over the place?&quot;.
+          Top eight industries by combined org count and bookings, each with
+          its sub-industries, distinctive naming conventions, and example
+          customer site structures pulled directly from Athena. Industries
+          outside the top eight are listed in the callout at the bottom.
         </Text>
-        <ComplexByIndustryTable />
+        <IndustryFeaturedCards />
       </Stack>
 
       <Divider />
 
       <Stack gap={10}>
-        <H2 id="complex-matrix">5. Industry × bookings band matrix</H2>
+        <H2 id="complex-matrix">5. By bookings band</H2>
         <Text size="small" tone="secondary">
-          Where the complex-and-high-value cells sit. Each cell is one
-          (industry, bookings band) bucket inside the complex tail.
+          One card per bookings band inside the complex tail. Each card shows
+          the top five industries in that band and the most common hierarchy
+          archetype customers in that cell use. Bands with fewer than five
+          complex orgs in an industry are hidden for sample-size reasons.
         </Text>
-        <ComplexMatrixTable />
+        <BookingsTierIndustryCards />
       </Stack>
 
       <Divider />
