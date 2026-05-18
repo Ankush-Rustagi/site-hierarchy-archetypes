@@ -4637,6 +4637,103 @@ const prettySubCode = (sub: string): string =>
   subCodeLabelsLookup[sub] ??
   sub.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Brief, glanceable labels for sub-codes. The verbose canonical label
+// (with the "e.g." example) stays in the title= hover so users can
+// still discover the full context. Anything not in this table falls
+// back to prettySubCode, which is itself already shorter than the
+// canonical label for sub-codes whose canonical label has examples.
+const SHORT_SUB_CODE_LABELS: Record<string, string> = {
+  retired: "retired",
+  staged: "staged",
+  demo_test: "demo / test",
+  temporary: "temporary",
+  school_district_code: "district code",
+  parenthetical_code: "paren code",
+  parenthetical_id: "paren id",
+  snake_case_geo: "snake_case geo",
+  all_caps_short: "ALL-CAPS acronym",
+  all_caps_long: "ALL-CAPS phrase",
+  embedded_id: "embedded id",
+  internal_prefix: "internal prefix",
+  state_two_letter: "state-letter prefix",
+  state_bare: "state code",
+  country_prefix: "country prefix",
+  city_comma_state: "city, state",
+  city_hyphen: "city pair",
+  street_address: "street addr",
+  police_fire: "police / fire",
+  justice: "justice",
+  religious: "religious",
+  clinic_health: "clinic / health",
+  school_named: "school E/M/H",
+  school_short: "school ES/MS/HS",
+  warehouse_dc: "warehouse / DC",
+  manufacturing: "plant / factory",
+  office_hq: "HQ / admin",
+  retail_format: "retail",
+  purpose_center: "purpose center",
+  hotel_hospitality: "hotel",
+  numbered_store: "numbered store",
+  numeric_prefix: "numeric prefix",
+  named_function: "place + function",
+  internal_function: "function word",
+  floor_ordinal: "floor (ordinal)",
+  floor_named: "floor (named)",
+  room_numbered: "room / suite",
+  classroom: "classroom",
+  building_letter: "building / wing",
+  cardinal: "cardinal dir",
+  inside_outside: "indoor / outdoor",
+  lobby_entry: "lobby / entry",
+  parking: "parking",
+  dock_gate: "dock / gate",
+  cafe_kitchen: "cafe / kitchen",
+  it_data_room: "IT / data",
+  lab_research: "lab",
+  zone_area: "zone / area",
+  elevator_stair: "elevator / stair",
+  direction_relative: "front / back",
+  direction_cardinal: "N / S / E / W",
+  entry_exit: "entry / exit",
+  dock: "dock",
+  gate_yard: "gate / yard",
+  parking_garage: "parking / garage",
+  circulation: "hallway / stairs",
+  device_zone: "device zone",
+  alarm_subpanel: "alarm sub-panel",
+  org_unit: "org unit",
+  named: "named entity",
+};
+
+const shortSubCode = (sub: string): string =>
+  SHORT_SUB_CODE_LABELS[sub] ?? prettySubCode(sub);
+
+// Brief labels for top-shape fallback chips. When a row has no
+// meaningful sub-code AND no compound qualifier, we still want to
+// label it with at least its broad TopShape family so the row is
+// never naked.
+const TOP_SHAPE_SHORT_LABEL: Record<string, string> = {
+  geo: "geographic",
+  entity: "entity name",
+  code: "opaque code",
+  corporate: "org unit",
+  function: "function",
+  spatial: "spatial",
+  lifecycle: "lifecycle",
+  device: "device-type",
+};
+
+const TOP_SHAPE_LONG_LABEL: Record<string, string> = {
+  geo: "geographic name (state, city, address, region)",
+  entity: "entity name (named entity, no detected sub-pattern)",
+  code: "opaque code or acronym",
+  corporate: "corporate / org unit",
+  function: "function or purpose-led name",
+  spatial: "spatial / intra-building granularity",
+  lifecycle: "lifecycle marker (retired, staged, demo, temporary)",
+  device: "device-type label",
+};
+
 const exampleNodeMix = (n: IndustryExampleChild): ProductMix => {
   const total =
     (n.cameras || 0) +
@@ -4807,16 +4904,30 @@ function detectQualifierClient(
   return null;
 }
 
+type SubtreeDisplayOptions = {
+  showSubCode: boolean;
+  showMix: boolean;
+  showCounts: boolean;
+};
+
+const DEFAULT_SUBTREE_DISPLAY: SubtreeDisplayOptions = {
+  showSubCode: true,
+  showMix: true,
+  showCounts: true,
+};
+
 // Renders the flat array of representative-root children (already in depth
 // order) as an indented tree. Adapter for the taxonomy.json example shape.
 function ExampleSubtree({
   rootName,
   rootDepth,
   children,
+  display = DEFAULT_SUBTREE_DISPLAY,
 }: {
   rootName: string;
   rootDepth: number;
   children: IndustryExampleChild[];
+  display?: SubtreeDisplayOptions;
 }): JSX.Element {
   return (
     <Stack gap={2}>
@@ -4848,11 +4959,57 @@ function ExampleSubtree({
         if (ac) deviceChips.push({ label: "AC", value: ac });
         if (alarmDev) deviceChips.push({ label: "alarm-dev", value: alarmDev });
         if (alarmPan) deviceChips.push({ label: "alarm-pan", value: alarmPan });
+
+        // The sub-code / qualifier pill. Falls back through three tiers:
+        //   1. Meaningful sub-code from the backend classifier
+        //   2. Compound qualifier detected client-side
+        //   3. TopShape family pill so the row is never naked
+        const subCodePill = (() => {
+          if (!display.showSubCode) return null;
+          if (subIsMeaningful) {
+            return (
+              <Pill
+                size="sm"
+                tone={subTone}
+                title={`${prettySubCode(n.subCode!)} (top shape: ${n.topShape ?? "n/a"})`}
+              >
+                {shortSubCode(n.subCode!)}
+              </Pill>
+            );
+          }
+          if (compound) {
+            return (
+              <Pill
+                size="sm"
+                tone={compoundTone}
+                title={`Compound qualifier: ${QUALIFIER_FAMILY_LABEL_CLIENT[compound.family]} (top shape: ${compoundTopShape ?? "spatial"})`}
+              >
+                {compound.label}
+              </Pill>
+            );
+          }
+          if (n.topShape && TOP_SHAPE_SHORT_LABEL[n.topShape]) {
+            return (
+              <Pill
+                size="sm"
+                tone={toneForTopShape(n.topShape)}
+                title={TOP_SHAPE_LONG_LABEL[n.topShape] ?? n.topShape}
+              >
+                {TOP_SHAPE_SHORT_LABEL[n.topShape]}
+              </Pill>
+            );
+          }
+          return null;
+        })();
+
         return (
           <Row key={`${n.name}-${i}`} gap={6} align="center">
             <span style={{ display: "inline-block", width: indent * 14 }} />
             <Text size="small" tone="secondary">└</Text>
             <Text size="small">{n.name}</Text>
+            {/* Pills cluster: pushes itself to the right with auto
+                margin. Sub-code / qualifier pill comes first, mix pill
+                after. */}
             <span
               style={{
                 marginLeft: "auto",
@@ -4861,7 +5018,22 @@ function ExampleSubtree({
                 alignItems: "center",
               }}
             >
-              {deviceChips.length > 0 ? (
+              {subCodePill}
+              {display.showMix ? <MixPill mix={exampleNodeMix(n)} /> : null}
+            </span>
+            {/* Device counts cluster: its own marginLeft auto so the
+                counts align to the absolute right edge across rows,
+                creating a vertical "counts column" the eye can scan. */}
+            {display.showCounts && deviceChips.length > 0 ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  gap: 8,
+                  alignItems: "center",
+                  minWidth: 120,
+                  justifyContent: "flex-end",
+                }}
+              >
                 <Row gap={6} align="center" wrap>
                   {deviceChips.map((c) => (
                     <Text
@@ -4874,26 +5046,10 @@ function ExampleSubtree({
                     </Text>
                   ))}
                 </Row>
-              ) : null}
-              {subIsMeaningful ? (
-                <Pill
-                  size="sm"
-                  tone={subTone}
-                  title={`${prettySubCode(n.subCode!)} (top shape: ${n.topShape ?? "n/a"})`}
-                >
-                  {prettySubCode(n.subCode!)}
-                </Pill>
-              ) : compound ? (
-                <Pill
-                  size="sm"
-                  tone={compoundTone}
-                  title={`Compound qualifier: ${QUALIFIER_FAMILY_LABEL_CLIENT[compound.family]} (top shape: ${compoundTopShape ?? "spatial"})`}
-                >
-                  {compound.label}
-                </Pill>
-              ) : null}
-              <MixPill mix={exampleNodeMix(n)} />
-            </span>
+              </span>
+            ) : display.showCounts ? (
+              <span style={{ display: "inline-block", minWidth: 120 }} />
+            ) : null}
           </Row>
         );
       })}
@@ -4901,7 +5057,13 @@ function ExampleSubtree({
   );
 }
 
-function FeaturedIndustryCard({ card }: { card: FeaturedCard }): JSX.Element {
+function FeaturedIndustryCard({
+  card,
+  subtreeDisplay = DEFAULT_SUBTREE_DISPLAY,
+}: {
+  card: FeaturedCard;
+  subtreeDisplay?: SubtreeDisplayOptions;
+}): JSX.Element {
   // Pull up to 2 example customers across this card's member sub-industries.
   // Each member can have an example list keyed by sub-industry name.
   const examples: IndustryExample[] = [];
@@ -5034,6 +5196,7 @@ function FeaturedIndustryCard({ card }: { card: FeaturedCard }): JSX.Element {
                           rootName={r.rootName}
                           rootDepth={r.rootDepth}
                           children={r.children}
+                          display={subtreeDisplay}
                         />
                       ))}
                     </Stack>
@@ -5048,6 +5211,100 @@ function FeaturedIndustryCard({ card }: { card: FeaturedCard }): JSX.Element {
   );
 }
 
+// Compact toolbar for the industry-section subtree visibility toggles.
+// Renders three checkbox-style pills the user can click to hide / show
+// each kind of metadata per row. State lives in IndustryFeaturedCards
+// so all 8 industry cards share the same setting; no persistence so
+// new visitors always land on a complete view.
+function SubtreeDisplayToolbar({
+  showSubCode,
+  showMix,
+  showCounts,
+  onToggleSubCode,
+  onToggleMix,
+  onToggleCounts,
+}: {
+  showSubCode: boolean;
+  showMix: boolean;
+  showCounts: boolean;
+  onToggleSubCode: () => void;
+  onToggleMix: () => void;
+  onToggleCounts: () => void;
+}): JSX.Element {
+  const ToggleChip = ({
+    label,
+    on,
+    onClick,
+    title,
+  }: {
+    label: string;
+    on: boolean;
+    onClick: () => void;
+    title: string;
+  }): JSX.Element => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={on}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 12px",
+        minHeight: 32,
+        borderRadius: 999,
+        border: `1px solid ${on ? "rgba(59,130,246,0.6)" : "#374151"}`,
+        background: on ? "rgba(59,130,246,0.18)" : "transparent",
+        color: on ? "#bfdbfe" : "#cbd5e1",
+        fontSize: 12,
+        fontWeight: 500,
+        cursor: "pointer",
+        font: "inherit",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          display: "inline-block",
+          width: 10,
+          height: 10,
+          borderRadius: 2,
+          border: `1px solid ${on ? "#3b82f6" : "#4b5563"}`,
+          background: on ? "#3b82f6" : "transparent",
+        }}
+      />
+      {label}
+    </button>
+  );
+  return (
+    <Row gap={8} align="center" wrap>
+      <Text size="small" weight="semibold" tone="secondary">
+        ROW DISPLAY
+      </Text>
+      <ToggleChip
+        label="Code / sub-code pill"
+        on={showSubCode}
+        onClick={onToggleSubCode}
+        title="Show or hide the per-row sub-code / qualifier pill (e.g., 'school E/M/H', 'city pair', 'gate / yard'). Resets on reload."
+      />
+      <ToggleChip
+        label="Product mix pill"
+        on={showMix}
+        onClick={onToggleMix}
+        title="Show or hide the per-row product-mix pill (e.g., 'cam', 'AC/alarms only'). Resets on reload."
+      />
+      <ToggleChip
+        label="Device counts"
+        on={showCounts}
+        onClick={onToggleCounts}
+        title="Show or hide the per-row device counts column (cameras, AC, alarm-dev, alarm-pan). Resets on reload."
+      />
+    </Row>
+  );
+}
+
 const IndustryFeaturedCards = (): JSX.Element => {
   const featured = (taxonomySnapshot.featuredCards as unknown as FeaturedCard[])
     .slice()
@@ -5057,11 +5314,34 @@ const IndustryFeaturedCards = (): JSX.Element => {
     .sort((a, b) => b.bookings - a.bookings);
   const notTotals = taxonomySnapshot.notCoveredTotals;
 
+  // Session-local visibility toggles. Default everything on so first
+  // visit shows the full picture. Per user request, no persistence.
+  const [showSubCode, setShowSubCode] = useState<boolean>(true);
+  const [showMix, setShowMix] = useState<boolean>(true);
+  const [showCounts, setShowCounts] = useState<boolean>(true);
+  const subtreeDisplay: SubtreeDisplayOptions = {
+    showSubCode,
+    showMix,
+    showCounts,
+  };
+
   return (
     <Stack gap={20}>
+      <SubtreeDisplayToolbar
+        showSubCode={showSubCode}
+        showMix={showMix}
+        showCounts={showCounts}
+        onToggleSubCode={() => setShowSubCode((v) => !v)}
+        onToggleMix={() => setShowMix((v) => !v)}
+        onToggleCounts={() => setShowCounts((v) => !v)}
+      />
       <Grid columns={2} gap={20}>
         {featured.map((card) => (
-          <FeaturedIndustryCard key={card.cardId} card={card} />
+          <FeaturedIndustryCard
+            key={card.cardId}
+            card={card}
+            subtreeDisplay={subtreeDisplay}
+          />
         ))}
       </Grid>
 
