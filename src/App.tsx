@@ -24,6 +24,8 @@ import { useEffect, useState } from "react";
 import type { JSX, ReactNode } from "react";
 import aggregateSnapshot from "./data/aggregate-patterns.json";
 import customerSubtreesSnapshot from "./data/customer-subtrees.json";
+import taxonomySnapshot from "./data/taxonomy.json";
+import sequencingSnapshot from "./data/sequencing.json";
 
 const OVERVIEW_HASHES = new Set([
   "customers-at-a-glance",
@@ -78,7 +80,6 @@ type ArchetypeFamily =
   | "single_campus"
   | "flat_fleet"
   | "deep_command"
-  | "hybrid_legacy"
   | "camera_only_flat"
   | "camera_only_geographic"
   | "camera_only_deep";
@@ -90,7 +91,6 @@ const archetypeFamilyLabels: Record<ArchetypeFamily, string> = {
   single_campus: "Single-campus institution",
   flat_fleet: "Flat-fleet district",
   deep_command: "Deep command hierarchy",
-  hybrid_legacy: "Hybrid legacy + corporate",
   camera_only_flat: "Camera-only flat",
   camera_only_geographic: "Camera-only geographic",
   camera_only_deep: "Camera-only deep",
@@ -103,7 +103,6 @@ const archetypeFamilyTone: Record<ArchetypeFamily, "info" | "warning" | "success
   single_campus: "renamed",
   flat_fleet: "added",
   deep_command: "deleted",
-  hybrid_legacy: "neutral",
   camera_only_flat: "neutral",
   camera_only_geographic: "info",
   camera_only_deep: "deleted",
@@ -132,6 +131,7 @@ type Customer = {
   organizationLogic: string;
   archetype: string;
   archetypeFamily: ArchetypeFamily;
+  secondaryArchetypeFamilies?: ArchetypeFamily[];
   useCases: string[];
   rootNames: string[];
   exampleBranches: { kind: string; path: string; mix: ProductMix }[];
@@ -163,6 +163,7 @@ const customers: Customer[] = [
     bookingsK: 5409,
     organizationLogic: "geographic_state_city_then_building_floor",
     archetypeFamily: "geographic_first",
+    secondaryArchetypeFamilies: ["function_first"],
     archetype: "Manufacturing facility tree",
     useCases: [
       "Per-site building security at multiple plants",
@@ -464,6 +465,7 @@ const customers: Customer[] = [
     bookingsK: 1886,
     organizationLogic: "functional_then_location_codes",
     archetypeFamily: "function_first",
+    secondaryArchetypeFamilies: ["facility_code"],
     archetype: "Function-first government tree",
     useCases: [
       "Four functional buckets (PRECINCT, CAUCUS, CONSTITUENCY, RESIDENCES) instead of geography",
@@ -652,6 +654,7 @@ const customers: Customer[] = [
     bookingsK: 800,
     organizationLogic: "single_campus_with_buildings",
     archetypeFamily: "single_campus",
+    secondaryArchetypeFamilies: ["facility_code"],
     archetype: "Single-campus institution",
     useCases: [
       "All sites are buildings on one physical campus (residential treatment center)",
@@ -849,6 +852,7 @@ const customers: Customer[] = [
     bookingsK: 4982,
     organizationLogic: "command_hierarchy_with_legacy_dead_ends",
     archetypeFamily: "deep_command",
+    secondaryArchetypeFamilies: ["flat_fleet"],
     archetype: "Deep command hierarchy",
     useCases: [
       "Territory > ARC Command > ARC Retail > Region > City > Store > Donation Site (7 levels)",
@@ -972,8 +976,9 @@ const customers: Customer[] = [
     productMixes: 5,
     bookingsK: 6877,
     organizationLogic: "mixed_state_school_codes_and_corporate_tree",
-    archetypeFamily: "hybrid_legacy",
-    archetype: "Two parallel hierarchies (legacy)",
+    archetypeFamily: "facility_code",
+    secondaryArchetypeFamilies: ["geographic_first"],
+    archetype: "Two parallel hierarchies (facility code + geographic)",
     useCases: [
       "Flat 'FL - SCHOOL_CODE (####)' roots from the original onboarding",
       "Newer 'Red Apple Education > Schools > Florida > <CODE>' parallel structure",
@@ -1077,8 +1082,9 @@ const customers: Customer[] = [
     productMixes: 5,
     bookingsK: 2139,
     organizationLogic: "ambiguous_facility_naming_then_zones",
-    archetypeFamily: "hybrid_legacy",
-    archetype: "Naming-debt manufacturer",
+    archetypeFamily: "flat_fleet",
+    secondaryArchetypeFamilies: ["facility_code", "function_first"],
+    archetype: "Naming-debt manufacturer (flat plants + informal codes + office/plant/DC mix)",
     useCases: [
       "Mix of facility names ('12 For Life Carrollton Ga', 'BWP Florence', 'ATL DC', 'Atl Spark Office')",
       "Substations and shipping zones as sub-nodes inside a plant ('Southwire Florence > BWP > Substations > ...')",
@@ -1180,6 +1186,7 @@ const customers: Customer[] = [
     bookingsK: 4582,
     organizationLogic: "encoded_site_codes_then_production_lines",
     archetypeFamily: "facility_code",
+    secondaryArchetypeFamilies: ["function_first"],
     archetype: "Plant-as-encoded-string + production lines",
     useCases: [
       "Each plant uses a hyphenated code: <City>-<Brand>-<Division>-<FacilityType> (<US_ST_CITY##>)",
@@ -1269,6 +1276,7 @@ const customers: Customer[] = [
     bookingsK: 675,
     organizationLogic: "strict_geographic_state_city_clinic",
     archetypeFamily: "geographic_first",
+    secondaryArchetypeFamilies: ["function_first"],
     archetype: "STATE > CITY > CLINIC tree",
     useCases: [
       "Strict geographic tree: state codes at top, then cities, then clinic names",
@@ -1531,12 +1539,6 @@ const archetypePatterns: { family: ArchetypeFamily; description: string; example
     description:
       "5+ levels: territory → division → command → region → city → site → sub-site. Mirrors a real-world chain of command. Tombstoning convention ('Z-prefix') for retired sites.",
     examples: ["Salvation Army - Western Territory"],
-  },
-  {
-    family: "hybrid_legacy",
-    description:
-      "Two parallel root structures: an old flat naming pattern and a newer corporate tree built without refactoring the old one. Earliest sign of org evolution. Hardest to consolidate.",
-    examples: ["Charter Schools USA", "Southwire Company LLC"],
   },
 ];
 
@@ -2309,7 +2311,10 @@ function CustomerDetail({
           </Pill>
         </Row>
         <Row gap={8} align="center" wrap>
-          <ArchetypePill family={c.archetypeFamily} />
+          <ArchetypePillGroup
+            primary={c.archetypeFamily}
+            secondary={c.secondaryArchetypeFamilies}
+          />
           <Text size="small" weight="semibold">
             {c.archetype}
           </Text>
@@ -2557,8 +2562,22 @@ const rootShapeColor: Record<RootShape, string> = {
   lifecycle_marker: colorPalette.yellow,
 };
 
+// Per-shape text color, tuned for >= 4.5:1 AA against the chip's tinted dark
+// background. Border still uses the saturated source color so the chip stays
+// visually distinct. Gray and blue source colors fail AA at 11px otherwise.
+const rootShapeTextColor: Record<RootShape, string> = {
+  geographic: "#93c5fd",
+  entity_name: "#c4b5fd",
+  facility_code: "#fcd34d",
+  corporate_tree: "#cbd5e1",
+  function_word: "#6ee7b7",
+  school_code: "#f9a8d4",
+  lifecycle_marker: "#facc15",
+};
+
 const ShapeChip = ({ shape }: { shape: RootShape }): JSX.Element => {
   const hex = rootShapeColor[shape];
+  const fg = rootShapeTextColor[shape];
   return (
     <span
       style={{
@@ -2568,7 +2587,7 @@ const ShapeChip = ({ shape }: { shape: RootShape }): JSX.Element => {
         borderRadius: 10,
         border: `1px solid ${hex}`,
         background: `${hex}22`,
-        color: hex,
+        color: fg,
         fontSize: 11,
         fontWeight: 600,
         lineHeight: 1.4,
@@ -2591,6 +2610,34 @@ const ArchetypePill = ({
     <Pill size="sm" tone={archetypeFamilyTone[family]}>
       {label ?? archetypeFamilyLabels[family]}
     </Pill>
+  );
+};
+
+const ArchetypePillGroup = ({
+  primary,
+  secondary,
+}: {
+  primary: ArchetypeFamily;
+  secondary?: ArchetypeFamily[];
+}): JSX.Element => {
+  const theme = useHostTheme();
+  const items = secondary ?? [];
+  return (
+    <Row gap={6} wrap>
+      <ArchetypePill family={primary} />
+      {items.length > 0 ? (
+        <>
+          <Text size="small" tone="secondary" style={{ color: theme.text.tertiary }}>
+            also
+          </Text>
+          {items.map((f) => (
+            <Pill key={`sec-${f}`} size="sm" tone={archetypeFamilyTone[f]} variant="outline">
+              {archetypeFamilyLabels[f]}
+            </Pill>
+          ))}
+        </>
+      ) : null}
+    </Row>
   );
 };
 
@@ -2631,7 +2678,7 @@ const ArchetypeFrequencyStats = (): JSX.Element => {
     <Grid columns={4} gap={16}>
       <Stat
         value={`${multiArchetypeOrgs.length} / ${total}`}
-        label="Multi-archetype orgs"
+        label="Multi-archetype in qualitative sample"
         tone="warning"
       />
       <Stat
@@ -2653,8 +2700,9 @@ const ArchetypeFrequencyStats = (): JSX.Element => {
 const PopulationCaveat = (): JSX.Element => {
   const totals = aggregateSnapshot.totals;
   const simple = aggregateSnapshot.simpleBase.cameraOnlyFlat;
+  const otherOrgs = (totals.totalOrgs - totals.complexTailSize).toLocaleString();
   return (
-    <Callout tone="info" title="Why these twelve and what about the other 35,079?">
+    <Callout tone="info" title={`Why these twelve and what about the other ${otherOrgs}?`}>
       These twelve customers were hand-picked from the complex tail. The other
       {" "}
       <Text as="span" weight="semibold">
@@ -2683,8 +2731,10 @@ const RootShapeAnalysis = (): JSX.Element => {
       <Stack gap={10}>
         <H3>Root-shape coverage across the 12 customers</H3>
         <Text size="small" tone="secondary">
-          How many of the 12 customers have at least one root of each shape? Most
-          customers fit 1–2 shapes; multi-archetype orgs contribute to 3+.
+          How many of the 12 customers have at least one root of each shape?
+          Most customers fit 1 to 2 shapes; orgs that carry both a primary and
+          a secondary archetype contribute to 3+. Qualitative sample only;
+          population-scoped naming distributions are in the Aggregate VIEW.
         </Text>
         <Table
           headers={[
@@ -3030,7 +3080,9 @@ function AccountLink({
       style={{
         background: "transparent",
         border: "none",
-        padding: 0,
+        padding: "12px 4px",
+        margin: "-12px -4px",
+        minHeight: 44,
         cursor: "pointer",
         font: "inherit",
         color: "#93c5fd",
@@ -3145,7 +3197,10 @@ const CustomerComparisonTable = ({
           <Text size="small" tone="secondary">
             {c.industry}
           </Text>,
-          <ArchetypePill family={c.archetypeFamily} />,
+          <ArchetypePillGroup
+            primary={c.archetypeFamily}
+            secondary={c.secondaryArchetypeFamilies}
+          />,
           num(c.totalSites),
           num(c.maxDepth),
           num(c.productMixes),
@@ -3197,32 +3252,73 @@ const SharedHeader = (): JSX.Element => {
   const totalAC = customers.reduce((a, c) => a + c.acPanels, 0);
   const totalAlarms = customers.reduce((a, c) => a + c.alarmDevices + c.alarmPanels, 0);
 
+  const totals = aggregateSnapshot.totals;
+  const tailBookingsB = (totals.complexTailBookings / 1_000_000_000).toFixed(2);
+
   return (
     <Stack gap={16}>
       <Stack gap={6}>
         <H1>Multi-product site hierarchy archetypes</H1>
         <Text tone="secondary">
-          Twelve paid Verkada customer orgs with complex, multi-product site trees. The
-          underlying data is a one-row-per-site dump (1,665 rows) across the top-12 plus
-          a 30-row candidate shortlist. Goal: understand how customers structure site
-          hierarchies and what use cases their structure implies. Not a cross-sell
-          analysis.
-        </Text>
-        <Text size="small" tone="secondary">
-          Source: Athena via Hex thread 019e2d6d-d87f-7001-bebe-43dc2dd4b14c · paid customer
-          orgs · site / device counts mapped through{" "}
-          <Code>auth.directory_paths_latest</Code> · entity types{" "}
-          <Code>camera</Code>, <Code>accessController</Code>, <Code>alarmsDevice</Code>,{" "}
-          <Code>alarmSystem</Code>.
+          How {totals.totalOrgs.toLocaleString()} active-paid Verkada accounts
+          structure their Command site hierarchies, with a deep dive into the
+          {" "}
+          <Text as="span" weight="semibold">
+            complex tail
+          </Text>{" "}
+          of {totals.complexTailSize.toLocaleString()} customers
+          ({(totals.complexTailOrgShare * 100).toFixed(1)}% of accounts) that
+          drive ${tailBookingsB}B
+          ({(totals.complexTailBookingsShare * 100).toFixed(1)}%) of lifetime
+          bookings. Goal: understand how naming and depth correlate with
+          industry, scale, and product mix.
         </Text>
       </Stack>
 
       <Grid columns={4} gap={16}>
-        <Stat value="12" label="Customers analyzed" />
-        <Stat value={totalSites.toLocaleString()} label="Total sites" />
-        <Stat value={totalCams.toLocaleString()} label="Cameras" />
-        <Stat value={(totalAC + totalAlarms).toLocaleString()} label="AC + alarms" />
+        <Stat
+          value={totals.totalOrgs.toLocaleString()}
+          label="Active-paid accounts (deduped)"
+        />
+        <Stat
+          value={totals.complexTailSize.toLocaleString()}
+          label="Complex-tail orgs (focus of this study)"
+          tone="info"
+        />
+        <Stat
+          value={`${(totals.complexTailBookingsShare * 100).toFixed(0)}%`}
+          label="Lifetime bookings concentration in the tail"
+          tone="success"
+        />
+        <Stat value="12" label="Hand-picked customers for deep-dive" />
       </Grid>
+
+      <Callout tone="neutral" title="About this data">
+        <Stack gap={6}>
+          <Text size="small" tone="secondary">
+            Athena via Hex, deduped to one row per Salesforce account (primary
+            org = the org with the most devices). Site and device counts mapped
+            through{" "}
+            <Code>auth.directory_paths_latest</Code>; entity types{" "}
+            <Code>camera</Code>, <Code>accessController</Code>,{" "}
+            <Code>alarmsDevice</Code>, <Code>alarmSystem</Code>. The 12
+            hand-picked customers in the deep-dive view cover{" "}
+            {totalSites.toLocaleString()} sites,{" "}
+            {totalCams.toLocaleString()} cameras, and{" "}
+            {(totalAC + totalAlarms).toLocaleString()} AC + alarm devices.
+          </Text>
+          <Text size="small" tone="secondary">
+            Footnote (data coverage):{" "}
+            {taxonomySnapshot.unclassifiedTotals.orgs.toLocaleString()}{" "}
+            accounts ({(taxonomySnapshot.unclassifiedTotals.shareOfOrgs * 100).toFixed(1)}%
+            of the population, ~$
+            {(taxonomySnapshot.unclassifiedTotals.bookings / 1_000_000).toFixed(1)}M
+            lifetime bookings) have no Salesforce industry tag and are excluded
+            from the industry breakdown. They are still included in the
+            top-line population total.
+          </Text>
+        </Stack>
+      </Callout>
     </Stack>
   );
 };
@@ -3440,7 +3536,19 @@ const scrollSpySuppress = { until: 0 };
 
 function scrollToSection(targetId: string): void {
   const el = document.getElementById(targetId);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const prevTabIndex = el.getAttribute("tabindex");
+    el.setAttribute("tabindex", "-1");
+    el.focus({ preventScroll: true });
+    if (prevTabIndex === null) {
+      setTimeout(() => {
+        if (el.getAttribute("tabindex") === "-1") {
+          el.removeAttribute("tabindex");
+        }
+      }, 0);
+    }
+  }
   if (typeof window !== "undefined" && window.history) {
     scrollSpySuppress.until = Date.now() + 1200;
     window.history.replaceState(null, "", `#${targetId}`);
@@ -3515,7 +3623,8 @@ function TableOfContents(): JSX.Element {
               border: "1px solid rgba(59, 130, 246, 0.4)",
               borderRadius: 999,
               color: "#bfdbfe",
-              padding: "3px 10px",
+              padding: "10px 14px",
+              minHeight: 36,
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",
@@ -3545,13 +3654,59 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
     setActiveRank(rank);
     setView("detail");
   };
+  const totals = aggregateSnapshot.totals;
+  const simple = aggregateSnapshot.simpleBase.cameraOnlyFlat;
   return (
     <Stack gap={24}>
+      <Callout tone="success" title="TL;DR. The four numbers to remember.">
+        <Stack gap={6}>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">
+              {(simple.orgShare * 100).toFixed(0)}% of accounts
+            </Text>{" "}
+            ({simple.orgs.toLocaleString()} of {totals.totalOrgs.toLocaleString()})
+            are camera-only and have a flat site list. They look the same to
+            Command and need no further analysis here.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">
+              {(totals.complexTailOrgShare * 100).toFixed(1)}% of accounts
+            </Text>{" "}
+            ({totals.complexTailSize.toLocaleString()} orgs) make up the
+            complex tail. They hold{" "}
+            <Text as="span" weight="semibold" size="small">
+              {(totals.complexTailBookingsShare * 100).toFixed(0)}% of lifetime
+              bookings
+            </Text>
+            . Every hierarchy decision below is aimed at this population.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">
+              Naming dominates structure.
+            </Text>{" "}
+            Most complex-tail customers fall into 1 to 2 of nine archetype
+            families that depend on how they name their roots (geography,
+            facility code, function, campus, fleet, command, or single-product
+            variants). Cross-customer search and IAM design should follow the
+            naming dimension first.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">
+              Multi-archetype is common in the complex tail.
+            </Text>{" "}
+            Several of the deep-dive customers carry a primary plus a
+            secondary archetype (e.g. Charter Schools USA = facility code +
+            geographic). The dashboard shows the secondary as an outline pill
+            beside the primary.
+          </Text>
+        </Stack>
+      </Callout>
+
       <Callout tone="info" title="How to read this canvas">
         <Stack gap={10}>
           <Text size="small">
-            Twelve complex multi-product customer hierarchies were sampled.
-            The page moves from{" "}
+            Twelve complex multi-product customer hierarchies were hand-picked
+            for qualitative deep-dive. The Overview moves from{" "}
             <Text as="span" weight="semibold" size="small">
               the raw data
             </Text>
@@ -3564,9 +3719,56 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
             <Text as="span" weight="semibold" size="small">
               findings
             </Text>
-            . Selection criteria for the 12 are at the bottom under Method.
+            . The Aggregate VIEW carries the full-population analysis. Customer
+            deep-dives carry per-customer subtrees. Selection criteria for the
+            12 are at the bottom under Method.
           </Text>
           <TableOfContents />
+        </Stack>
+      </Callout>
+
+      <Callout tone="neutral" title="Glossary (terms used throughout)">
+        <Stack gap={6}>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">Archetype family.</Text>{" "}
+            The shape of a customer's site tree, named by what the depth-1
+            (root) sites are. Nine families: geographic-first, facility-code,
+            function-first, single-campus, flat-fleet, deep-command, and three
+            camera-only variants. A customer can carry one primary archetype
+            and one or more secondary archetypes if their tree mixes shapes.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">Complex tail.</Text>{" "}
+            The subset of accounts whose Command site tree is non-trivial.
+            Concretely:{" "}
+            {aggregateSnapshot.totals.complexTailSize.toLocaleString()} orgs
+            ({(aggregateSnapshot.totals.complexTailOrgShare * 100).toFixed(1)}%
+            of the population) selected by a composite score that combines
+            site depth, product-line count, and lifetime bookings. They hold
+            {" "}{(aggregateSnapshot.totals.complexTailBookingsShare * 100).toFixed(0)}%
+            of all lifetime bookings.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">Root shape.</Text>{" "}
+            How a customer names their depth-1 sites (geographic, facility
+            code, function word, entity name, corporate tree, school code, or
+            lifecycle marker). One customer can have multiple shapes at the
+            same depth.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">Sub-archetype tag.</Text>{" "}
+            A finer-grained classification of a single root or sub-tree based
+            on naming patterns (e.g. "city + zip", "facility code with
+            building suffix"). The full taxonomy and per-industry sub-segments
+            are in <Code>src/data/taxonomy.json</Code>.
+          </Text>
+          <Text size="small">
+            <Text as="span" weight="semibold" size="small">Bookings tier.</Text>{" "}
+            SMB (&lt; $25k lifetime), commercial ($25k to $100k), mid-market
+            ($100k to $500k), enterprise ($500k to $5M), strategic (&gt; $5M).
+            Used as a secondary axis when sub-segmenting customers within an
+            industry.
+          </Text>
         </Stack>
       </Callout>
 
@@ -3578,7 +3780,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
           Source data for everything below. Each row is one customer's
           hierarchy summarized into counts. The <Text as="span" weight="semibold">Archetype</Text>{" "}
           column (next to Industry) is the synthesized family this customer
-          belongs to — we'll unpack what that means in the next section.
+          belongs to (unpacked in the next section).
         </Text>
         <CustomerComparisonTable onPickCustomer={pickCustomer} />
         <Text size="small" tone="secondary">
@@ -3603,7 +3805,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
         </Text>
         <Grid columns={2} gap={12}>
           <Card>
-            <CardHeader>Layer 1 — Root shape</CardHeader>
+            <CardHeader>Layer 1. Root shape</CardHeader>
             <CardBody>
               <Text size="small">
                 How a customer <Text as="span" weight="semibold">names</Text>{" "}
@@ -3614,7 +3816,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
             </CardBody>
           </Card>
           <Card>
-            <CardHeader>Layer 2 — Archetype family</CardHeader>
+            <CardHeader>Layer 2. Archetype family</CardHeader>
             <CardBody>
               <Text size="small">
                 How the <Text as="span" weight="semibold">whole tree</Text> is
@@ -3631,7 +3833,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
 
       <Stack gap={16}>
         <Stack gap={6}>
-          <H2 id="root-shapes">3. Layer 1 — Root shapes</H2>
+          <H2 id="root-shapes">3. Layer 1. Root shapes</H2>
           <Text size="small" tone="secondary">
             What customers literally type at the top of their hierarchy. Each
             chip color in this section corresponds to one naming style; the
@@ -3645,7 +3847,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
 
       <Stack gap={16}>
         <Stack gap={6}>
-          <H2 id="archetype-families">4. Layer 2 — Archetype families</H2>
+          <H2 id="archetype-families">4. Layer 2. Archetype families</H2>
           <Text size="small" tone="secondary">
             What the full tree is doing once you read past depth 1. Seven
             families emerge from the twelve customers. The four counts below
@@ -3821,7 +4023,6 @@ const ARCHETYPE_ORDER: ArchetypeFamily[] = [
   "function_first",
   "single_campus",
   "flat_fleet",
-  "hybrid_legacy",
   "camera_only_deep",
   "camera_only_geographic",
   "camera_only_flat",
@@ -4516,9 +4717,16 @@ export default function App(): JSX.Element {
         padding: "32px 24px 64px",
       }}
     >
-      <div style={{ maxWidth: 1440, margin: "0 auto" }}>
+      <a href="#main-content" className="vk-skip-link">
+        Skip to main content
+      </a>
+      <main
+        id="main-content"
+        aria-label="Multi-product site hierarchy archetypes dashboard"
+        style={{ maxWidth: 1440, margin: "0 auto" }}
+      >
         <MultiProductSiteHierarchyArchetypes />
-      </div>
+      </main>
     </div>
   );
 }

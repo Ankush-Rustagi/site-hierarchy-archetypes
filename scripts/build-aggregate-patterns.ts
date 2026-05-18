@@ -17,14 +17,18 @@ import { fileURLToPath } from "node:url";
 import {
   ArchetypeFamily,
   ARCHETYPE_FAMILIES,
+  CompositionVector,
   OrgClassificationInput,
   RootShape,
   ROOT_SHAPES,
   SingleProductCohort,
+  composeRootShapes,
+  dominantShare,
   hasLifecycleMarkers,
   inferArchetypeFamily,
   inferRootShape,
   isMultiArchetype,
+  pickDominantShape,
   rootShapeLabels,
   singleProductCohort,
 } from "./classifier.ts";
@@ -117,6 +121,10 @@ type AxesRow = {
 
 type ClassifiedOrg = OrgRow & {
   rootShapes: RootShape[];
+  composition: CompositionVector;
+  dominantShape: RootShape | undefined;
+  dominantShareValue: number;
+  distinctShapeCount: number;
   archetypeFamily: ArchetypeFamily;
   multiArchetype: boolean;
   lifecycleMarkers: boolean;
@@ -128,28 +136,32 @@ type ClassifiedOrg = OrgRow & {
   complexityScore: number;
 };
 
-// --- Industry bucketing (same as build-snapshots) ---
+// --- Industry bucketing (anchored on parenthesised SIC codes; previous
+//     `\b<digit>\b` patterns were leaking across industries, e.g. (11)
+//     in Agriculture matched (6111) in K-12). Keep this in sync with
+//     scripts/build-taxonomy-snapshot.ts. ---
 const INDUSTRY_BUCKETS: { match: RegExp; bucket: string }[] = [
-  { match: /Education - Elementary|6111/i, bucket: "K-12" },
-  { match: /Education - Colleges|Higher|6112|6113|6114/i, bucket: "Higher Ed" },
-  { match: /Health Care|62/i, bucket: "Healthcare" },
-  { match: /Manufacturing|31-33|31\/33/i, bucket: "Manufacturing" },
-  { match: /Retail|44-45/i, bucket: "Retail" },
-  { match: /Transportation|48-49/i, bucket: "Transportation & Logistics" },
-  { match: /Utilities|^22\b/i, bucket: "Utilities" },
-  { match: /Public Administration|Police|92\b/i, bucket: "Government" },
-  { match: /Construction|^23\b/i, bucket: "Construction" },
-  { match: /Agriculture|Forestry|Fishing|Hunting|11\b/i, bucket: "Agriculture" },
-  { match: /Real Estate|Rental|Leasing|53\b/i, bucket: "Real Estate" },
-  { match: /Finance|Insurance|52\b/i, bucket: "Financial Services" },
-  { match: /Professional|Scientific|Technical|54\b/i, bucket: "Professional Services" },
-  { match: /Information|51\b/i, bucket: "Tech & Information" },
-  { match: /Religious|Grantmaking|Civic|813|Non[-\s]?profit/i, bucket: "Nonprofit & Civic" },
-  { match: /Accommodation|Food Services|72\b/i, bucket: "Hospitality" },
-  { match: /Wholesale|42\b/i, bucket: "Wholesale" },
-  { match: /Arts|Entertainment|Recreation|71\b/i, bucket: "Arts & Entertainment" },
-  { match: /Mining|Oil|Gas|21\b/i, bucket: "Energy & Mining" },
-  { match: /Administrative|Support|Waste|56\b/i, bucket: "Admin & Support" },
+  { match: /\(6111\)/i, bucket: "K-12" },
+  { match: /\(6112,? ?6113,? ?6114\)/i, bucket: "Higher Ed" },
+  { match: /\(61 except 6111[^)]*\)/i, bucket: "Trade Schools & Other Ed" },
+  { match: /\(62\)/i, bucket: "Healthcare" },
+  { match: /\(31-33\)/i, bucket: "Manufacturing" },
+  { match: /\(44-45\)/i, bucket: "Retail" },
+  { match: /\(48-49\)/i, bucket: "Transportation & Logistics" },
+  { match: /\(22\)/i, bucket: "Utilities" },
+  { match: /\(92\)/i, bucket: "Government" },
+  { match: /\(23\)/i, bucket: "Construction" },
+  { match: /\(11\)/i, bucket: "Agriculture" },
+  { match: /\(53\)/i, bucket: "Real Estate" },
+  { match: /\(52\)/i, bucket: "Financial Services" },
+  { match: /\(54\)/i, bucket: "Professional Services" },
+  { match: /\(51\)/i, bucket: "Tech & Information" },
+  { match: /\(813\)/i, bucket: "Nonprofit & Civic" },
+  { match: /\(72\)/i, bucket: "Hospitality" },
+  { match: /\(42\)/i, bucket: "Wholesale" },
+  { match: /\(71\)/i, bucket: "Arts & Entertainment" },
+  { match: /\(21\)/i, bucket: "Energy & Mining" },
+  { match: /\(55, 56, 81[^)]*\)/i, bucket: "Admin & Support" },
 ];
 function bucketIndustry(s: string): string {
   if (!s) return "Unknown / Other";
@@ -252,9 +264,15 @@ function classifyAll(orgs: OrgRow[], roots: RootRow[], axes: Map<string, AxesRow
     const lifetimeBookings = ax?.lifetimeBookings ?? 0;
     const complexityScore =
       m.maxDepth + m.productLinesCount + (lifetimeBookings > 1 ? Math.log10(lifetimeBookings) : 0);
+    const composition = composeRootShapes(shapes);
+    const dominant = pickDominantShape(shapes);
     return {
       ...m,
       rootShapes: shapes,
+      composition,
+      dominantShape: dominant,
+      dominantShareValue: dominantShare(shapes),
+      distinctShapeCount: new Set(shapes).size,
       archetypeFamily: family,
       multiArchetype: isMultiArchetype(shapes),
       lifecycleMarkers: hasLifecycleMarkers(shapes),
@@ -438,8 +456,68 @@ function main() {
     };
   }).filter((b) => b.orgs > 0);
 
+  // Cross-tail root-shape composition: average of per-org composition
+  // vectors, plus an org-weighted "share of complex tail whose dominant
+  // shape is X" view for the headline.
+  type ShapeComposition = Record<RootShape, number>;
+  function emptyShapeComp(): ShapeComposition {
+    return {
+      geographic: 0,
+      facility_code: 0,
+      function_word: 0,
+      entity_name: 0,
+      corporate_tree: 0,
+      school_code: 0,
+      lifecycle_marker: 0,
+    };
+  }
+  function averageComposition(members: ClassifiedOrg[]): ShapeComposition {
+    const out = emptyShapeComp();
+    const n = members.length;
+    if (n === 0) return out;
+    for (const m of members) {
+      for (const s of ROOT_SHAPES) out[s] += m.composition[s];
+    }
+    for (const s of ROOT_SHAPES) out[s] = out[s] / n;
+    return out;
+  }
+  function dominantShareSummary(members: ClassifiedOrg[]): {
+    dominantCounts: Record<RootShape, number>;
+    dominantShares: Record<RootShape, number>;
+    mixedShare: number;
+  } {
+    const counts = emptyShapeComp();
+    let mixed = 0;
+    for (const m of members) {
+      if (m.dominantShape) counts[m.dominantShape] += 1;
+      if (m.dominantShareValue < 0.6) mixed += 1;
+    }
+    const n = members.length;
+    const shares = emptyShapeComp();
+    for (const s of ROOT_SHAPES) shares[s] = n > 0 ? counts[s] / n : 0;
+    return {
+      dominantCounts: counts,
+      dominantShares: shares,
+      mixedShare: n > 0 ? mixed / n : 0,
+    };
+  }
+
+  const complexAvgComposition = averageComposition(complex);
+  const complexDomSummary = dominantShareSummary(complex);
+
   // Industry rollup scoped to complex tail.
-  type Example = { archetype: ArchetypeFamily; orgName: string; totalSites: number; cameras: number; bookings: number };
+  type Example = {
+    orgName: string;
+    archetype: ArchetypeFamily;
+    dominantShape: RootShape | null;
+    dominantShare: number;
+    composition: ShapeComposition;
+    distinctShapes: number;
+    totalSites: number;
+    maxDepth: number;
+    cameras: number;
+    bookings: number;
+  };
   type IndustryRollupRow = {
     industry: string;
     orgs: number;
@@ -450,6 +528,9 @@ function main() {
     modalShare: number;
     entropy: number;
     multiArchetypeRate: number;
+    mixedCompositionRate: number; // share of orgs where dominantShareValue < 0.6
+    avgComposition: ShapeComposition;
+    dominantShapeShares: ShapeComposition;
     medianSites: number;
     medianMaxDepth: number;
     medianBookings: number;
@@ -479,22 +560,22 @@ function main() {
       if (p > 0) entropy -= p * Math.log2(p);
     }
     const multi = members.filter((m) => m.multiArchetype).length;
-    const examples: Example[] = [];
-    const seen = new Set<ArchetypeFamily>();
+    const mixedComp = members.filter((m) => m.dominantShareValue < 0.6).length;
     const ranked = members.slice().sort((a, b) => b.lifetimeBookings - a.lifetimeBookings);
-    for (const m of ranked) {
-      if (seen.has(m.archetypeFamily)) continue;
-      seen.add(m.archetypeFamily);
-      examples.push({
-        archetype: m.archetypeFamily,
-        orgName: m.sfdcAccountName,
-        totalSites: m.totalSites,
-        cameras: m.cameras,
-        bookings: m.lifetimeBookings,
-      });
-      if (examples.length >= 6) break;
-    }
+    const examples: Example[] = ranked.slice(0, 6).map((m) => ({
+      orgName: m.sfdcAccountName,
+      archetype: m.archetypeFamily,
+      dominantShape: m.dominantShape ?? null,
+      dominantShare: Number(m.dominantShareValue.toFixed(3)),
+      composition: m.composition,
+      distinctShapes: m.distinctShapeCount,
+      totalSites: m.totalSites,
+      maxDepth: m.maxDepth,
+      cameras: m.cameras,
+      bookings: m.lifetimeBookings,
+    }));
     const bookings = members.reduce((s, m) => s + m.lifetimeBookings, 0);
+    const dom = dominantShareSummary(members);
     industryRollup.push({
       industry,
       orgs: members.length,
@@ -505,6 +586,9 @@ function main() {
       modalShare,
       entropy,
       multiArchetypeRate: members.length > 0 ? multi / members.length : 0,
+      mixedCompositionRate: members.length > 0 ? mixedComp / members.length : 0,
+      avgComposition: averageComposition(members),
+      dominantShapeShares: dom.dominantShares,
       medianSites: median(members.map((m) => m.totalSites)),
       medianMaxDepth: median(members.map((m) => m.maxDepth)),
       medianBookings: median(members.map((m) => m.lifetimeBookings)),
@@ -557,8 +641,10 @@ function main() {
     }
   }
 
-  // Top-N highest-bookings complex orgs as a teaser table (anonymise? no -
-  // these are SFDC names already used in the 12-customer deep dives).
+  // Top-N highest-bookings complex orgs as a teaser table. Includes
+  // composition vector so the UI can render a per-org composition pill
+  // (e.g. "60% geographic / 25% entity / 15% function") instead of a
+  // single junk-drawer label.
   const topComplexOrgs = complex
     .slice()
     .sort((a, b) => b.lifetimeBookings - a.lifetimeBookings)
@@ -572,6 +658,10 @@ function main() {
       productLines: o.productLinesCount,
       distinctProductMixes: o.distinctProductMixes,
       archetype: o.archetypeFamily,
+      dominantShape: o.dominantShape ?? null,
+      dominantShare: Number(o.dominantShareValue.toFixed(3)),
+      composition: o.composition,
+      distinctShapes: o.distinctShapeCount,
       complexityScore: Number(o.complexityScore.toFixed(2)),
     }));
 
@@ -612,6 +702,13 @@ function main() {
       archetypeShares: complexArchetypeShares,
       rootShapeCoverage: complexRootCoverage,
       multiArchetypeRate: complex.length > 0 ? complex.filter((o) => o.multiArchetype).length / complex.length : 0,
+      // Average root-shape composition vector across the complex tail, plus
+      // the share of complex orgs whose dominant shape is X. mixedShare is
+      // the fraction whose dominant shape holds less than 60% of their
+      // depth-1 roots (i.e. their structure is genuinely a mix).
+      avgComposition: complexAvgComposition,
+      dominantShapeShares: complexDomSummary.dominantShares,
+      mixedCompositionRate: complexDomSummary.mixedShare,
       byBookingBand: complexByBand,
       industryRollup,
       industryByBookingBand: matrix,

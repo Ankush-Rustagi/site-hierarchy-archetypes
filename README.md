@@ -4,34 +4,36 @@ Interactive dashboard for the Maps 2 research question: **how do complex,
 multi-product Verkada customers actually structure their site hierarchies, and
 what naming patterns and archetype families fall out of that?**
 
-The dashboard has four VIEWs in the top-of-page switcher:
+The dashboard has three VIEWs in the top-of-page switcher:
 
-- **Overview** — cross-cutting cards: customer comparison table, root-shape
-  coverage, archetype family cards, consolidated findings.
-- **Customer deep-dives (12)** — one tab per hand-picked customer with their
+- **Overview.** Population-scoped TL;DR, glossary, then qualitative cross
+  cutting cards from the 12 deep-dive sample (customer comparison table,
+  root-shape coverage, archetype family cards, consolidated findings, method
+  notes). The header surfaces the full active-paid denominator
+  (~31K accounts deduped to one row per Salesforce account) and the
+  complex-tail share of bookings.
+- **Customer deep-dives (12).** One tab per hand-picked customer with their
   emblematic site subtree, scope and device stats, root-name pills colored by
-  inferred shape, and representative branches from the full hierarchy. A
-  single-click CSV download contains all 143 hierarchy nodes across the 12
-  customers (rank, name, path, depth, node type, product mix, device counts)
-  for feeding into Cursor / Claude to generate Maps 2 navigation mockups.
-  Each detail page also includes a **Representative subtrees from Athena**
-  section: one card per root-shape the customer uses (geographic /
-  facility-code / function-word / corporate-tree / school-code / entity-name
-  / lifecycle-marker), with the actual full subtree from
+  inferred shape, and representative branches from the full hierarchy.
+  Customers whose tree mixes shapes show a primary archetype pill plus
+  outline pills for each secondary archetype (e.g. Charter Schools USA =
+  facility code + geographic; Southwire = flat fleet + facility code +
+  function first). A single-click CSV download contains every hierarchy node
+  across the 12 customers (rank, name, path, depth, node type, product mix,
+  device counts). Each detail page also includes a **Representative subtrees
+  from Athena** section: one card per root-shape the customer uses
+  (geographic, facility-code, function-word, corporate-tree, school-code,
+  entity-name, or lifecycle-marker), with the actual full subtree from
   `auth.directory_paths_latest` so the *sub-archetypes inside* a single
-  customer are visible (e.g. BC Legislative Assembly's three functional
-  roots; Charter Schools USA's flat school-code roots next to the corporate
-  Red Apple > Schools > Florida tree).
-- **Population analysis (~35K orgs)** — the same classifier run against the
-  full active-paid customer base. Headline frequencies, root-shape coverage,
-  archetype-family distribution (all orgs vs the complex subset side by side),
-  single-product cohort splits (camera-only, access-only, alarms-only,
-  multi-product), and the comparison cohort the original 12 missed because of
-  the 25–400 site cap.
-- **Industry analysis** — Industry × size × bookings × device-count matrix,
-  per-industry archetype entropy and modal share, cross-industry cosine
-  similarity, and per-vertical deep-dive cards. Answers “does Healthcare at
-  200 cameras look like K-12 at 200 cameras?”.
+  customer are visible.
+- **Aggregate patterns (complex tail).** The same classifier run against the
+  full active-paid customer base. Simple-base vs complex-tail split,
+  archetype family distribution across the tail, bookings-band breakdown, an
+  industry x archetype matrix, and the method note. The Aggregate VIEW is
+  where the population analysis lives. The earlier "Population analysis" and
+  "Industry analysis" tabs were collapsed into this single Aggregate VIEW.
+  Per-industry sub-segment data and per-customer example trees are in
+  `src/data/taxonomy.json` and are not yet rendered as a separate VIEW.
 
 The dashboard is a static React + Vite build deployed via GitHub Actions to
 GitHub Pages. The source of truth for content is `src/App.tsx`, which is a
@@ -47,9 +49,10 @@ direct port of the underlying Cursor Canvas
 - `dim_account_hierarchy` for `is_active_paid`, SFDC industry, segment,
   lifetime bookings.
 - Twelve-customer narrative content is an embedded snapshot in `src/App.tsx`.
-  Population and industry views import pre-aggregated JSON from `src/data/`
-  built by `scripts/build-snapshots.ts`. Nothing runs in the browser at
-  runtime.
+- Aggregate / population analysis imports pre-aggregated JSON from
+  `src/data/aggregate-patterns.json`, `customer-subtrees.json`,
+  `taxonomy.json`, and `sequencing.json`. Files are built by scripts in
+  `scripts/` and committed. Nothing runs in the browser at runtime.
 
 See [`data-sources.md`](./data-sources.md) for the full pipeline (queries,
 row counts, filter logic, snapshot outputs).

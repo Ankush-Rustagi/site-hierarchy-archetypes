@@ -286,26 +286,50 @@ function AnchorLink({ targetId }: { targetId: string }) {
     const el = document.getElementById(targetId);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Move focus so keyboard / screen-reader users land on the heading.
+      // Use tabIndex -1 as a transient focus stop without polluting tab order.
+      const prevTabIndex = el.getAttribute("tabindex");
+      el.setAttribute("tabindex", "-1");
+      el.focus({ preventScroll: true });
+      if (prevTabIndex === null) {
+        // Restore after focus has been delivered; keep it removable for next jump.
+        setTimeout(() => {
+          if (el.getAttribute("tabindex") === "-1") {
+            el.removeAttribute("tabindex");
+          }
+        }, 0);
+      }
     }
     if (typeof window !== "undefined" && window.history) {
       window.history.replaceState(null, "", `#${targetId}`);
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof window !== "undefined") {
+      const url = `${window.location.origin}${window.location.pathname}#${targetId}`;
+      navigator.clipboard.writeText(url).catch(() => {
+        // Clipboard may be unavailable (insecure context, permissions); ignore silently.
+      });
     }
   };
   return (
     <a
       href={`#${targetId}`}
       onClick={onClick}
-      aria-label="Copy link to this section"
-      title="Copy a direct link to this section"
+      aria-label="Jump to and copy link for this section"
+      title="Jump to this section (and copy its URL)"
       className="vk-anchor"
       style={{
-        color: "#6b7280",
+        color: "#9ca3af",
         fontSize: 16,
         textDecoration: "none",
         lineHeight: 1,
-        padding: "2px 6px",
+        padding: "8px 10px",
+        minWidth: 44,
+        minHeight: 44,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
         borderRadius: 4,
-        opacity: 0.65,
+        opacity: 0.85,
       }}
     >
       #
@@ -476,6 +500,7 @@ type PillProps = {
   children?: ReactNode;
   size?: "sm" | "md" | "lg";
   tone?: PillTone;
+  variant?: "solid" | "outline";
   active?: boolean;
   onClick?: () => void;
   leadingContent?: ReactNode;
@@ -486,6 +511,7 @@ export function Pill({
   children,
   size = "sm",
   tone = "neutral",
+  variant = "solid",
   active,
   onClick,
   leadingContent,
@@ -494,34 +520,41 @@ export function Pill({
   const t = PILL_TONE[tone];
   const sz = PILL_SIZE_PX[size];
   const interactive = !!onClick;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      disabled={!interactive}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: active ? t.border + "33" : t.bg,
-        color: t.fg,
-        border: `1px solid ${active ? t.border : t.border + "80"}`,
-        boxShadow: active ? `0 0 0 2px ${t.border}40` : undefined,
-        padding: sz.pad,
-        borderRadius: 999,
-        fontSize: sz.fs,
-        fontWeight: 600,
-        lineHeight: 1.3,
-        cursor: interactive ? "pointer" : "default",
-        whiteSpace: "nowrap",
-        font: "inherit",
-        appearance: "none",
-      }}
-    >
+  const baseStyle = {
+    display: "inline-flex" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    background: active ? t.border + "33" : variant === "outline" ? "transparent" : t.bg,
+    color: t.fg,
+    border: `1px solid ${active ? t.border : variant === "outline" ? t.border + "60" : t.border + "80"}`,
+    boxShadow: active ? `0 0 0 2px ${t.border}40` : undefined,
+    padding: sz.pad,
+    borderRadius: 999,
+    fontSize: sz.fs,
+    fontWeight: 600,
+    lineHeight: 1.3,
+    cursor: interactive ? "pointer" : "default",
+    whiteSpace: "nowrap" as const,
+    font: "inherit",
+    appearance: "none" as const,
+  };
+  const inner = (
+    <>
       {leadingContent ? <span style={{ display: "inline-flex" }}>{leadingContent}</span> : null}
       <span style={{ fontSize: sz.fs, fontWeight: 600 }}>{children}</span>
-    </button>
+    </>
+  );
+  if (interactive) {
+    return (
+      <button type="button" onClick={onClick} title={title} style={baseStyle}>
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <span title={title} style={{ ...baseStyle, cursor: "default" }}>
+      {inner}
+    </span>
   );
 }
 
