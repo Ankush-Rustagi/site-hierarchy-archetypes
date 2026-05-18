@@ -3151,23 +3151,23 @@ function AccountLink({
         minHeight: 44,
         cursor: "pointer",
         font: "inherit",
-        color: "#93c5fd",
+        color: "#a1a1aa",
         textAlign: "left",
         fontSize: 13,
         fontWeight: 600,
         textDecoration: "underline",
-        textDecorationColor: "rgba(147, 197, 253, 0.4)",
+        textDecorationColor: "rgba(161, 161, 170, 0.4)",
         textUnderlineOffset: 3,
       }}
       onMouseOver={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.color = "#bfdbfe";
+        (e.currentTarget as HTMLButtonElement).style.color = "#d4d4d8";
         (e.currentTarget as HTMLButtonElement).style.textDecorationColor =
-          "#bfdbfe";
+          "#d4d4d8";
       }}
       onMouseOut={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
+        (e.currentTarget as HTMLButtonElement).style.color = "#a1a1aa";
         (e.currentTarget as HTMLButtonElement).style.textDecorationColor =
-          "rgba(147, 197, 253, 0.4)";
+          "rgba(161, 161, 170, 0.4)";
       }}
     >
       {name}
@@ -3843,10 +3843,10 @@ function SectionJumpButton({
       onClick={() => scrollToSection(targetId)}
       title={`Scroll to the ${label.replace(/\s*→$/, "")} section`}
       style={{
-        background: "rgba(59, 130, 246, 0.12)",
-        border: "1px solid rgba(59, 130, 246, 0.5)",
+        background: "rgba(161, 161, 170, 0.08)",
+        border: "1px solid rgba(161, 161, 170, 0.3)",
         borderRadius: 6,
-        color: "#93c5fd",
+        color: "#a1a1aa",
         padding: "6px 12px",
         fontSize: 12.5,
         fontWeight: 600,
@@ -3856,13 +3856,13 @@ function SectionJumpButton({
       }}
       onMouseOver={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background =
-          "rgba(59, 130, 246, 0.22)";
-        (e.currentTarget as HTMLButtonElement).style.color = "#bfdbfe";
+          "rgba(161, 161, 170, 0.16)";
+        (e.currentTarget as HTMLButtonElement).style.color = "#d4d4d8";
       }}
       onMouseOut={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background =
-          "rgba(59, 130, 246, 0.12)";
-        (e.currentTarget as HTMLButtonElement).style.color = "#93c5fd";
+          "rgba(161, 161, 170, 0.08)";
+        (e.currentTarget as HTMLButtonElement).style.color = "#a1a1aa";
       }}
     >
       {label}
@@ -5271,8 +5271,8 @@ function SubtreeDisplayToolbar({
           width: 10,
           height: 10,
           borderRadius: 2,
-          border: `1px solid ${on ? "#3b82f6" : "#4b5563"}`,
-          background: on ? "#3b82f6" : "transparent",
+          border: `1px solid ${on ? "#71717a" : "#4b5563"}`,
+          background: on ? "#52525b" : "transparent",
         }}
       />
       {label}

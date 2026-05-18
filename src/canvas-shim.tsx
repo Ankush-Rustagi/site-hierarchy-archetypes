@@ -370,7 +370,7 @@ const TEXT_TONE_COLOR: Record<TextTone, string> = {
   primary: DARK_THEME.text.primary,
   secondary: DARK_THEME.text.secondary,
   tertiary: DARK_THEME.text.tertiary,
-  info: "#60a5fa",
+  info: "#a1a1aa",
   warning: "#fbbf24",
   success: "#34d399",
   danger: "#f87171",
@@ -570,7 +570,7 @@ type StatProps = {
 
 const STAT_TONE_COLOR: Record<NonNullable<StatProps["tone"]>, string> = {
   neutral: DARK_THEME.text.primary,
-  info: "#93c5fd",
+  info: "#a1a1aa",
   warning: "#fcd34d",
   success: "#6ee7b7",
   danger: "#fca5a5",
@@ -697,7 +697,7 @@ const CALLOUT_TONE: Record<
   NonNullable<CalloutProps["tone"]>,
   { bg: string; border: string; title: string }
 > = {
-  info: { bg: "#1e3a8a26", border: "#3b82f6", title: "#bfdbfe" },
+  info: { bg: "#27272a40", border: "#71717a", title: "#d4d4d8" },
   warning: { bg: "#78350f26", border: "#f59e0b", title: "#fde68a" },
   success: { bg: "#064e3b26", border: "#10b981", title: "#a7f3d0" },
   danger: { bg: "#7f1d1d26", border: "#ef4444", title: "#fecaca" },
@@ -764,9 +764,9 @@ export function Button({
       title={title}
       disabled={disabled}
       style={{
-        background: isPrimary ? "#3b82f6" : DARK_THEME.bg.elevated,
-        color: isPrimary ? "#ffffff" : DARK_THEME.text.primary,
-        border: `1px solid ${isPrimary ? "#3b82f6" : DARK_THEME.stroke.primary}`,
+        background: isPrimary ? "#27272a" : DARK_THEME.bg.elevated,
+        color: isPrimary ? "#fafafa" : DARK_THEME.text.primary,
+        border: `1px solid ${isPrimary ? "#3f3f46" : DARK_THEME.stroke.primary}`,
         borderRadius: 6,
         padding: "8px 14px",
         fontSize: 13,
