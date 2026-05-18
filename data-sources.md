@@ -4,10 +4,10 @@ All Athena queries for this dashboard run through the **Hex MCP** against the
 existing Hex thread `019e2d6d-d87f-7001-bebe-43dc2dd4b14c`.
 [Open the thread in Hex](https://app.hex.tech/01994010-b1bc-7003-9f8a-14d990c51106/thread/019e2d6d-d87f-7001-bebe-43dc2dd4b14c).
 
-The pipeline is one-way: Hex queries Athena, returns flat CSVs, and the local
-`scripts/build-snapshots.ts` script classifies, aggregates, and writes typed
-JSON into `src/data/`. The dashboard imports the JSON at build time. **Nothing
-runs in the browser at runtime.**
+The pipeline is one-way: Hex queries Athena, returns flat CSVs, and two local
+scripts classify, aggregate, and write typed JSON into `src/data/`. The
+dashboard imports the JSON at build time. **Nothing runs in the browser at
+runtime.**
 
 ## Source tables
 
@@ -30,8 +30,11 @@ rebuild the snapshots. Row counts as of the 2026-05-18 pull:
 | `org_metrics.csv` | One row per `organization_id` | 35,091 |
 | `root_names.csv` | One row per (org, depth-1 site name) | 150,333 |
 | `org_axes.csv` | One row per `sfdc_account_id` | 31,408 |
-| `comparison_cohort.csv` | One row per org passing the original complexity gate (no size cap) | 156 |
 | `customer_subtrees.csv` | One row per (org, site) at every depth for the 12 deep-dive customers only | 1,708 |
+
+`comparison_cohort.csv` was used for an earlier "population + industry" view
+that has since been collapsed into the single Aggregate patterns view; you can
+drop it if you re-pull data.
 
 ## Filter applied at extraction time
 
@@ -50,18 +53,17 @@ their hierarchy patterns in the population view.
 data/raw/*.csv
    │
    ▼
-npm run build:snapshots   (tsx scripts/build-snapshots.ts)
+npm run build:aggregate   (tsx scripts/build-aggregate-patterns.ts)
    │
    ├─ classify root names      (scripts/classifier.ts)
    ├─ classify archetype family
-   ├─ aggregate frequencies, root-shape coverage
-   ├─ build industry × size × bookings × device matrix
-   ├─ compute intra/cross-industry similarity
+   ├─ compute composite complexity score per org
+   │    (max_depth + product_lines_count + log10(lifetime_bookings))
+   ├─ split base: camera-only-flat callout + complex tail (top quintile)
+   ├─ within complex tail: archetype shares, root-shape coverage,
+   │    bookings-band rollup, industry rollup, industry × band matrix
    └─ emit:
-        src/data/population.json
-        src/data/industry-matrix.json
-        src/data/comparison-cohort.json
-        src/data/method-numbers.json
+        src/data/aggregate-patterns.json
 
 npm run build:subtrees    (tsx scripts/build-customer-subtrees.ts)
    │
@@ -105,9 +107,10 @@ Assembly) shows both side by side.
 ## Known limitations
 
 1. `org_axes.current_arr` and `org_axes.account_age_days` are NULL — neither is
-   materialized in the existing Hex `site_metrics` dataframe. ARR overlay in the
-   industry matrix uses `lifetime_bookings` instead. If you need real ARR, the
-   Hex agent can run a follow-up cell joining `dim_account_hierarchy` directly.
+   materialized in the existing Hex `site_metrics` dataframe. The aggregate
+   patterns view uses `lifetime_bookings` everywhere instead. If you need real
+   ARR, the Hex agent can run a follow-up cell joining `dim_account_hierarchy`
+   directly.
 2. Partners are excluded by design (`record_type_name__c = 'End Customer'`).
 3. Site → device mapping reuses the production cross-sell rule (parse the
    second-to-last segment of each entity's directory path, reformat to a

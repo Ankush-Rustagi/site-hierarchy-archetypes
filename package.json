@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview --port 4173",
-    "build:snapshots": "tsx scripts/build-snapshots.ts",
-    "build:subtrees": "tsx scripts/build-customer-subtrees.ts"
+    "build:subtrees": "tsx scripts/build-customer-subtrees.ts",
+    "build:aggregate": "tsx scripts/build-aggregate-patterns.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
