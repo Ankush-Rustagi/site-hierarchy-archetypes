@@ -4226,7 +4226,10 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
               <Code>max_depth + product_lines_count + log10(lifetime_bookings)</Code>;
               top-quintile cutoff = {t.complexityCutoffScore.toFixed(2)}.
               Method: percentile-rank cutoff computed locally in TypeScript
-              from the Hex Athena pulls.)
+              from the Hex Athena pulls. Counts are one row per Salesforce
+              account; for accounts with multiple Verkada organizations, the
+              one with the highest total device count is treated as the
+              primary deployment.)
             </Text>
           </Text>
           <Row gap={8} align="center">
@@ -4329,7 +4332,10 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
           is a percentile rank, computed locally in TypeScript from
           flat CSVs pulled via the Hex MCP against Athena. No
           statistical model or machine learning; this is pure
-          aggregation.)
+          aggregation. Each Salesforce account is represented by its
+          primary Verkada organization (the org with the highest total
+          device count), so accounts with many child orgs (Hilton Grand
+          Vacations, AMETEK, etc.) appear once.)
         </Text>
         <Text size="small" tone="secondary">
           Data pulled via the Hex MCP on{" "}

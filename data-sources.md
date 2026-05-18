@@ -32,6 +32,16 @@ rebuild the snapshots. Row counts as of the 2026-05-18 pull:
 | `org_axes.csv` | One row per `sfdc_account_id` | 31,408 |
 | `customer_subtrees.csv` | One row per (org, site) at every depth for the 12 deep-dive customers only | 1,708 |
 
+`org_metrics.csv` returns one row per **organization**, but Salesforce accounts
+can have many child organizations (Hilton Grand Vacations has 32, AMETEK 28,
+The Picklr 27, etc.). The aggregate pipeline collapses 35,091 org rows down to
+31,408 unique Salesforce accounts by picking the org with the highest total
+device count per account (cameras + access panels + alarm devices + alarm
+panels). Ties break on `total_sites` desc, then `organization_id` asc. The
+picked primary org represents the customer's main production deployment;
+the discarded orgs are typically dev / test / partner-owned / single-site
+child accounts that don't reflect the customer's actual site hierarchy.
+
 `comparison_cohort.csv` was used for an earlier "population + industry" view
 that has since been collapsed into the single Aggregate patterns view; you can
 drop it if you re-pull data.
@@ -55,6 +65,7 @@ data/raw/*.csv
    ▼
 npm run build:aggregate   (tsx scripts/build-aggregate-patterns.ts)
    │
+   ├─ pick primary org per Salesforce account (most devices wins)
    ├─ classify root names      (scripts/classifier.ts)
    ├─ classify archetype family
    ├─ compute composite complexity score per org

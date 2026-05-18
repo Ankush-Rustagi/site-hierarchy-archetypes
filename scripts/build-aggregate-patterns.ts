@@ -318,12 +318,63 @@ function rootShapeCoverage(orgs: ClassifiedOrg[]) {
 }
 
 // --- Main aggregation ---
+/**
+ * Deduplicate org_metrics.csv down to one row per sfdc_account_id.
+ *
+ * Some customers (Hilton Grand Vacations, AMETEK, etc.) have many child
+ * organizations under a single Salesforce account. Treating each org as a
+ * separate row inflates the population and double-counts the same customer
+ * in headline numbers, industry rollups, and top-N tables.
+ *
+ * The picker keeps the org with the highest total device count (cameras +
+ * ac_panels + alarm_devices + alarm_panels). That's a strong proxy for the
+ * customer's primary production environment (test orgs, partner-owned orgs,
+ * and demo orgs typically have zero or very few devices). Ties break on
+ * total_sites desc, then organization_id asc for stability.
+ */
+function pickPrimaryOrgPerAccount(orgs: OrgRow[]): {
+  primaries: OrgRow[];
+  collapsedOrgs: number;
+  multiOrgAccounts: number;
+} {
+  const byAccount = new Map<string, OrgRow[]>();
+  for (const o of orgs) {
+    const list = byAccount.get(o.sfdcAccountId) ?? [];
+    list.push(o);
+    byAccount.set(o.sfdcAccountId, list);
+  }
+  const primaries: OrgRow[] = [];
+  let multiOrgAccounts = 0;
+  for (const [, members] of byAccount) {
+    if (members.length > 1) multiOrgAccounts += 1;
+    const sorted = members.slice().sort((a, b) => {
+      const devA = a.cameras + a.acPanels + a.alarmDevices + a.alarmPanels;
+      const devB = b.cameras + b.acPanels + b.alarmDevices + b.alarmPanels;
+      if (devB !== devA) return devB - devA;
+      if (b.totalSites !== a.totalSites) return b.totalSites - a.totalSites;
+      return a.organizationId.localeCompare(b.organizationId);
+    });
+    primaries.push(sorted[0]);
+  }
+  return {
+    primaries,
+    collapsedOrgs: orgs.length - primaries.length,
+    multiOrgAccounts,
+  };
+}
+
 function main() {
   console.log("Loading...");
-  const orgs = loadOrgs();
+  const orgsRaw = loadOrgs();
   const roots = loadRoots();
   const axes = loadAxes();
-  console.log(`  ${orgs.length} orgs, ${roots.length} root rows, ${axes.size} axes rows`);
+  console.log(`  ${orgsRaw.length} org rows, ${roots.length} root rows, ${axes.size} axes rows`);
+
+  const { primaries: orgs, collapsedOrgs, multiOrgAccounts } =
+    pickPrimaryOrgPerAccount(orgsRaw);
+  console.log(
+    `  picked primary org per Salesforce account: ${orgs.length} kept, ${collapsedOrgs} child orgs collapsed across ${multiOrgAccounts} multi-org accounts`,
+  );
 
   const classified = classifyAll(orgs, roots, axes);
   const totalOrgs = classified.length;
