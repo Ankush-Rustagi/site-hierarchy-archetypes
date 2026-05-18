@@ -1540,6 +1540,24 @@ const archetypePatterns: { family: ArchetypeFamily; description: string; example
       "5+ levels: territory → division → command → region → city → site → sub-site. Mirrors a real-world chain of command. Tombstoning convention ('Z-prefix') for retired sites.",
     examples: ["Salvation Army - Western Territory"],
   },
+  {
+    family: "camera_only_flat",
+    description:
+      "Cameras only (no AC, no alarms) with a flat list of sites at depth 1. The dominant pattern in the active-paid population: most accounts that buy Verkada start here and stay here. Site tree is doing minimal work; the search and filter UX has to carry the load.",
+    examples: ["~54% of all accounts (population-wide)", "863 orgs in the complex tail"],
+  },
+  {
+    family: "camera_only_geographic",
+    description:
+      "Cameras only, but with a real geographic tree (state, region, city) at depth 1+. Same single-product surface area as camera_only_flat but the customer is grouping by territory. Read this as a camera-only customer about to evolve toward access control or alarms.",
+    examples: ["148 orgs in the complex tail", "~$105M lifetime bookings"],
+  },
+  {
+    family: "camera_only_deep",
+    description:
+      "Cameras only with 4+ levels of hierarchy. Rare but distinctive. Usually a single-product customer with a strong operational structure (chain retail, large logistics fleet) that has not yet adopted the rest of the security stack.",
+    examples: ["120 orgs in the complex tail", "~$95M lifetime bookings"],
+  },
 ];
 
 function nodeTypeColor(type: NodeType, theme: ReturnType<typeof useHostTheme>): string {
