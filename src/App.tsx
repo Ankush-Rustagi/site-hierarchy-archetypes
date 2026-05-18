@@ -3456,10 +3456,16 @@ const ViewSwitcher = ({
   );
 };
 
+// Shared between the scroll-spy and any explicit "jump to section" callers.
+// While Date.now() < this value, the spy suppresses its hash updates so an
+// in-flight smooth scroll can finish without the spy retargeting it.
+const scrollSpySuppress = { until: 0 };
+
 function scrollToSection(targetId: string): void {
   const el = document.getElementById(targetId);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   if (typeof window !== "undefined" && window.history) {
+    scrollSpySuppress.until = Date.now() + 1200;
     window.history.replaceState(null, "", `#${targetId}`);
   }
 }
@@ -4614,6 +4620,7 @@ function MultiProductSiteHierarchyArchetypes(): JSX.Element {
       }
       if (targetView) setView(targetView);
       if (targetCustomerRank) setActiveRank(targetCustomerRank);
+      scrollSpySuppress.until = Date.now() + 1200;
       window.requestAnimationFrame(() => {
         const el = document.getElementById(raw);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4623,6 +4630,93 @@ function MultiProductSiteHierarchyArchetypes(): JSX.Element {
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
   }, [setView, setActiveRank]);
+
+  // Scroll-spy: track which known anchor is closest to the top of the
+  // viewport and reflect it in the URL hash without firing `hashchange`. Uses
+  // `history.replaceState` so it never pollutes the back/forward history.
+  // Re-runs whenever `view` changes because each VIEW mounts a different set
+  // of section anchors.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("IntersectionObserver" in window)) return;
+
+    const isKnownHash = (id: string): boolean => {
+      if (OVERVIEW_HASHES.has(id)) return true;
+      if (POPULATION_HASHES.has(id)) return true;
+      if (INDUSTRY_HASHES.has(id)) return true;
+      if (DETAIL_HASHES.has(id)) return true;
+      if (/^customer-\d+$/.test(id)) return true;
+      return false;
+    };
+
+    // Allow the new VIEW to paint before querying its anchors.
+    const setup = () => {
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>("[id]"),
+      ).filter((el) => isKnownHash(el.id));
+      if (candidates.length === 0) return () => {};
+
+      // Track each anchor's most recent intersection ratio so we can pick the
+      // "topmost-visible" one whenever any of them changes. The rootMargin
+      // pushes the activation band to the top quarter of the viewport so the
+      // hash flips when a heading reaches the top, not when it merely enters
+      // from the bottom.
+      const visibility = new Map<string, { ratio: number; top: number }>();
+
+      const recompute = () => {
+        if (Date.now() < scrollSpySuppress.until) return;
+        let bestId: string | null = null;
+        let bestTop = Number.POSITIVE_INFINITY;
+        for (const [id, v] of visibility) {
+          if (v.ratio <= 0) continue;
+          // Prefer the section whose top is closest to (but at or above) the
+          // activation band — i.e. the smallest non-negative top, falling
+          // back to the largest negative if none qualify.
+          const score = v.top >= -16 ? v.top : 10_000 - v.top;
+          if (score < bestTop) {
+            bestTop = score;
+            bestId = id;
+          }
+        }
+        if (!bestId) return;
+        const currentHash = window.location.hash.replace(/^#/, "");
+        if (currentHash === bestId) return;
+        // replaceState does NOT fire `hashchange`, so this loop is safe.
+        window.history.replaceState(null, "", `#${bestId}`);
+      };
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            const id = (e.target as HTMLElement).id;
+            visibility.set(id, {
+              ratio: e.intersectionRatio,
+              top: e.boundingClientRect.top,
+            });
+          }
+          recompute();
+        },
+        {
+          // Anchor activates once it reaches the top quarter of the viewport.
+          rootMargin: "-15% 0px -70% 0px",
+          threshold: [0, 0.01, 0.25, 0.5, 0.75, 1],
+        },
+      );
+
+      for (const el of candidates) observer.observe(el);
+      return () => observer.disconnect();
+    };
+
+    const cleanupRef: { current: (() => void) | null } = { current: null };
+    const raf = window.requestAnimationFrame(() => {
+      cleanupRef.current = setup();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (cleanupRef.current) cleanupRef.current();
+    };
+  }, [view]);
 
   return (
     <Stack gap={20}>
