@@ -2957,7 +2957,7 @@ const WhatWeLearnedSection = (): JSX.Element => {
         </Card>
 
         <Card>
-          <CardHeader>7. Multi-archetype is common at the high-complexity end</CardHeader>
+          <CardHeader>7. Mixing two or more naming shapes is common at the high-complexity end</CardHeader>
           <CardBody>
             <Stack gap={8}>
               <Text size="small">
@@ -3696,22 +3696,47 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
         <H2 id="method">Method &amp; caveats</H2>
         <Stack gap={6}>
           <Text size="small">
-            Filters applied (in order): paid customer orgs only (
-            <Code>is_active_paid = TRUE</Code> via the dim_account_hierarchy
-            chain) · account name does not contain &quot;verkada&quot; or
-            &quot;personal&quot; · total_sites between 25 and 400 ·
-            max_depth ≥ 3 · product_lines_count ≥ 3 ·
-            distinct_product_mixes ≥ 3 · at least 2 of (structural ≥ 5,
-            mixed ≥ 3, dead-end ≥ 5). Ordered by distinct_product_mixes ↓
-            then max_depth ↓ then total_sites ↓.
+            How the twelve customers were picked, in plain English: active
+            paid customers only (excluding internal Verkada / personal
+            test accounts), between 25 and 400 sites, site tree at least
+            three levels deep, at least three product lines deployed, at
+            least three distinct product-mix patterns across their sites,
+            and enough structural complexity that the shortlist felt
+            non-trivial to a human reviewer. Ranked by product-mix
+            variety, then tree depth, then size.{" "}
+            <Text as="span" tone="secondary">
+              (Filter footnote:{" "}
+              <Code>is_active_paid = TRUE</Code> via{" "}
+              <Code>dim_account_hierarchy</Code>; account name not
+              ILIKE &quot;%verkada%&quot; or &quot;%personal%&quot;;{" "}
+              <Code>total_sites BETWEEN 25 AND 400</Code>;{" "}
+              <Code>max_depth ≥ 3</Code>;{" "}
+              <Code>product_lines_count ≥ 3</Code>;{" "}
+              <Code>distinct_product_mixes ≥ 3</Code>; at least 2 of
+              (<Code>structural ≥ 5</Code>, <Code>mixed ≥ 3</Code>,{" "}
+              <Code>dead-end ≥ 5</Code>). Ordered by{" "}
+              <Code>distinct_product_mixes</Code> desc, then{" "}
+              <Code>max_depth</Code> desc, then{" "}
+              <Code>total_sites</Code> desc. Method: SQL filter over
+              an Athena-materialised dataframe, run via the Hex MCP.)
+            </Text>
           </Text>
           <Text size="small">
-            Site-to-device mapping follows the production cross-sell query:
-            parse the second-to-last segment of each entity's directory path,
-            reformat to a hyphenated UUID, confirm parent{" "}
-            <Code>entity_type = 'site'</Code>. Cameras mapped through this
-            directory-path rule, NOT{" "}
-            <Code>vcamera.camera_group_cameras_latest</Code> (dead table).
+            How sites are connected to devices: every device record
+            includes a hierarchy path; the segment immediately above
+            the device names which site it belongs to. We trust that
+            relationship and confirm it points at a real site row
+            before counting the device.{" "}
+            <Text as="span" tone="secondary">
+              (Method footnote: parse the second-to-last segment of
+              each entity&apos;s{" "}
+              <Code>auth.directory_paths_latest</Code> path, reformat
+              to a hyphenated UUID, confirm parent{" "}
+              <Code>entity_type = &apos;site&apos;</Code>. Cameras map
+              through this directory-path rule, not through{" "}
+              <Code>vcamera.camera_group_cameras_latest</Code> (dead
+              table).)
+            </Text>
           </Text>
           <Text size="small" tone="secondary">
             Subtree node names, depths, and node-type classifications are
@@ -3843,7 +3868,7 @@ const OverviewAggregateStats = (): JSX.Element => {
       />
       <Stat
         value={`${t.complexTailSize.toLocaleString()} (${fmtPct(t.complexTailOrgShare, 0)})`}
-        label="Complex tail (top-quintile orgs)"
+        label="Complex tail (top 20% by complexity)"
         tone="warning"
       />
       <Stat
@@ -3881,13 +3906,17 @@ const SimpleBaseCallout = (): JSX.Element => {
             <Text as="span" weight="semibold">{fmtMoney(cf.medianBookings)}</Text>.
           </Text>
           <Text size="small" tone="secondary">
-            Widening the lens to all orgs below the median composite-complexity
-            score (max_depth + product_lines + log10(bookings) &lt;{" "}
-            <Code>{sb.scoreThreshold.toFixed(2)}</Code>) catches{" "}
-            {sb.orgs.toLocaleString()} orgs ({fmtPct(sb.orgShare, 0)}) holding
-            {" "}{fmtPct(sb.bookingsShare, 0)} of bookings. That entire half of
-            the base is &quot;already fine&quot; from a hierarchy standpoint;
-            the rest of this VIEW is about the other half.
+            Widening the lens to all orgs in the simpler half of the base
+            (low site depth, few product lines, modest bookings) catches{" "}
+            {sb.orgs.toLocaleString()} orgs ({fmtPct(sb.orgShare, 0)})
+            holding only {fmtPct(sb.bookingsShare, 0)} of bookings. That
+            entire half is &quot;already fine&quot; from a hierarchy
+            standpoint; the rest of this VIEW is about the other half.{" "}
+            <Text as="span" tone="secondary">
+              (Cutoff = median complexity score{" "}
+              <Code>{sb.scoreThreshold.toFixed(2)}</Code>; see method
+              footnote below.)
+            </Text>
           </Text>
         </Stack>
       </Callout>
@@ -3904,8 +3933,8 @@ const SimpleBaseByBookingsTable = (): JSX.Element => {
         <PopColHead key="band" label="Bookings band" />,
         <PopColHead key="total" label="Orgs in band" />,
         <PopColHead key="cf" label="Camera-only flat" />,
-        <PopColHead key="orgShare" label="Share of band (orgs)" tooltip="What fraction of orgs in this bookings band are camera-only-flat." />,
-        <PopColHead key="bookShare" label="Share of band ($)" tooltip="What fraction of the bookings inside this band are held by camera-only-flat orgs." />,
+        <PopColHead key="orgShare" label="Share of band (orgs)" tooltip="What share of customers in this bookings band have the simple camera-only flat hierarchy. (Org-count share within the band.)" />,
+        <PopColHead key="bookShare" label="Share of band ($)" tooltip="What share of revenue in this bookings band comes from customers with the simple camera-only flat hierarchy. (Sum of lifetime_bookings inside the band, share attributable to camera-only-flat orgs.)" />,
       ]}
       columnAlign={["left", "right", "right", "right", "right"]}
       colMinWidth={[140, 100, 130, 150, 150]}
@@ -3940,12 +3969,12 @@ const ComplexTailHeadline = (): JSX.Element => {
       />
       <Stat
         value={tail.medianTotalSites.toLocaleString()}
-        label="Median sites"
+        label="Typical site count (median)"
         tone="info"
       />
       <Stat
         value={tail.medianMaxDepth.toString()}
-        label="Median max depth"
+        label="Typical site tree depth (median)"
         tone="info"
       />
     </Grid>
@@ -4007,11 +4036,11 @@ const ComplexByBookingsTable = (): JSX.Element => {
         <PopColHead key="orgs" label="Orgs" />,
         <PopColHead key="bookings" label="Bookings" />,
         <PopColHead key="share" label="Share of complex bookings" />,
-        <PopColHead key="depth" label="Median max depth" />,
-        <PopColHead key="mixes" label="Median product mixes" />,
-        <PopColHead key="sites" label="Median sites" />,
-        <PopColHead key="cams" label="Median cameras" />,
-        <PopColHead key="modal" label="Modal archetype" />,
+        <PopColHead key="depth" label="Typical site tree depth" tooltip="Typical hierarchy depth for an org in this slice. (Median of max_depth across the slice.)" />,
+        <PopColHead key="mixes" label="Typical product-mix variety" tooltip="How varied the site-level product mix is across an orgs sites, on average. (Median of distinct_product_mixes across orgs in the slice.)" />,
+        <PopColHead key="sites" label="Typical site count" tooltip="Typical number of sites for an org in this slice. (Median of total_sites across the slice.)" />,
+        <PopColHead key="cams" label="Typical camera count" tooltip="Typical number of cameras deployed for an org in this slice. (Median of camera_count across the slice.)" />,
+        <PopColHead key="modal" label="Most common archetype" />,
       ]}
       columnAlign={["left", "right", "right", "right", "right", "right", "right", "right", "left"]}
       colMinWidth={[120, 70, 90, 140, 110, 130, 100, 110, 200]}
@@ -4048,12 +4077,12 @@ const ComplexByIndustryTable = (): JSX.Element => {
         <PopColHead key="orgs" label="Complex orgs" />,
         <PopColHead key="bk" label="Bookings" />,
         <PopColHead key="share" label="Share of complex bookings" />,
-        <PopColHead key="modal" label="Modal archetype" />,
-        <PopColHead key="modalShare" label="Modal share" tooltip="Fraction of complex orgs in this industry that fall into the modal archetype." />,
-        <PopColHead key="ent" label="Entropy" tooltip="Higher = more fragmented archetype mix inside the industry; lower = more uniform." />,
-        <PopColHead key="multi" label="Multi-arch rate" />,
-        <PopColHead key="medSites" label="Median sites" />,
-        <PopColHead key="medDepth" label="Median depth" />,
+        <PopColHead key="modal" label="Most common archetype" />,
+        <PopColHead key="modalShare" label="Top-archetype share" tooltip="What share of complex orgs in this industry use the most common archetype. (Mode-of-distribution share.)" />,
+        <PopColHead key="ent" label="Mix evenness" tooltip="How evenly the industry's complex orgs are spread across different archetypes. Higher = many archetypes share the industry; lower = one or two archetypes dominate. (Shannon entropy of the archetype distribution, in bits.)" />,
+        <PopColHead key="multi" label="Mixed-shape rate" tooltip="Share of orgs in this slice that use 3+ different naming conventions for their top-level sites. (Multi-archetype rate.)" />,
+        <PopColHead key="medSites" label="Typical site count" tooltip="Typical number of sites for a complex org in this industry. (Median of total_sites across complex orgs in the industry.)" />,
+        <PopColHead key="medDepth" label="Typical site tree depth" tooltip="Typical hierarchy depth for a complex org in this industry. (Median of max_depth across complex orgs in the industry.)" />,
       ]}
       columnAlign={["left", "right", "right", "right", "left", "right", "right", "right", "right", "right"]}
       colMinWidth={[180, 90, 100, 150, 200, 90, 80, 110, 100, 100]}
@@ -4096,10 +4125,10 @@ const ComplexMatrixTable = (): JSX.Element => {
           <PopColHead key="band" label="Bookings band" />,
           <PopColHead key="orgs" label="Orgs" />,
           <PopColHead key="bk" label="Bookings" />,
-          <PopColHead key="modal" label="Modal archetype" />,
-          <PopColHead key="ms" label="Modal share" />,
-          <PopColHead key="multi" label="Multi-arch rate" />,
-          <PopColHead key="depth" label="Median depth" />,
+          <PopColHead key="modal" label="Most common archetype" />,
+          <PopColHead key="ms" label="Top-archetype share" />,
+          <PopColHead key="multi" label="Mixed-shape rate" tooltip="Share of orgs in this slice that use 3+ different naming conventions for their top-level sites. (Multi-archetype rate.)" />,
+          <PopColHead key="depth" label="Typical site tree depth" tooltip="Typical hierarchy depth for an org in this (industry, bookings) cell. (Median of max_depth across the cell.)" />,
         ]}
         columnAlign={["left", "left", "right", "right", "left", "right", "right", "right"]}
         colMinWidth={[170, 110, 70, 100, 200, 90, 110, 110]}
@@ -4143,7 +4172,7 @@ const TopComplexOrgsTable = (): JSX.Element => {
           <PopColHead key="lines" label="Product lines" />,
           <PopColHead key="mixes" label="Product mixes" />,
           <PopColHead key="arch" label="Archetype" />,
-          <PopColHead key="score" label="Complexity score" />,
+          <PopColHead key="score" label="Complexity score" tooltip="A simple ranking score that combines three things: how deep an org's site tree goes, how many product lines they own, and how much they have booked with us. Higher = more complex. (Score = max_depth + product_lines_count + log10(lifetime_bookings); computed locally in TypeScript from the Hex Athena pulls.)" />,
         ]}
         columnAlign={["left", "left", "right", "right", "right", "right", "right", "left", "right"]}
         colMinWidth={[240, 180, 130, 70, 80, 100, 110, 200, 110]}
@@ -4188,10 +4217,17 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
             where this view spends its time.
           </Text>
           <Text size="small" tone="secondary">
-            Complexity score per org ={" "}
-            <Code>max_depth + product_lines_count + log10(lifetime_bookings)</Code>.
-            Complex tail = top-quintile cutoff{" "}
-            <Code>{t.complexityCutoffScore.toFixed(2)}</Code>.
+            How &quot;complex&quot; is defined: each org gets a complexity
+            score that adds up how deep their site tree goes, how many
+            product lines they own, and how much they&apos;ve spent with
+            us. The complex tail is the top 20% of orgs by that score.{" "}
+            <Text as="span" tone="secondary">
+              (Score per org ={" "}
+              <Code>max_depth + product_lines_count + log10(lifetime_bookings)</Code>;
+              top-quintile cutoff = {t.complexityCutoffScore.toFixed(2)}.
+              Method: percentile-rank cutoff computed locally in TypeScript
+              from the Hex Athena pulls.)
+            </Text>
           </Text>
           <Row gap={8} align="center">
             <Button variant="secondary" onClick={() => setView("overview")}>
@@ -4220,8 +4256,9 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Stack gap={10}>
         <H2 id="complex-tail">2. The complex tail at a glance</H2>
         <Text size="small" tone="secondary">
-          Headline numbers for the top-quintile cohort. Sites are deeper,
-          product mixes are richer, bookings are concentrated.
+          Headline numbers for the top 20% of orgs by complexity. Sites
+          are deeper, product mixes are richer, and bookings are
+          concentrated.
         </Text>
         <ComplexTailHeadline />
         <ComplexArchetypeMixTable />
@@ -4233,8 +4270,8 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
         <H2 id="complex-by-bookings">3. Complex tail by bookings band</H2>
         <Text size="small" tone="secondary">
           Where the bookings actually live inside the complex tail. The
-          modal archetype column flags how hierarchy shape changes as
-          revenue grows.
+          &quot;Most common archetype&quot; column flags how hierarchy
+          shape changes as revenue grows.
         </Text>
         <ComplexByBookingsTable />
       </Stack>
@@ -4244,9 +4281,10 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Stack gap={10}>
         <H2 id="complex-by-industry">4. Complex tail by industry</H2>
         <Text size="small" tone="secondary">
-          Industries ranked by bookings inside the complex tail. The modal
-          archetype and entropy answer &quot;does this industry have a
-          single dominant hierarchy pattern or is it fragmented?&quot;.
+          Industries ranked by bookings inside the complex tail. The
+          &quot;most common archetype&quot; and &quot;mix evenness&quot;
+          columns answer &quot;does this industry have a single dominant
+          hierarchy pattern or is the mix all over the place?&quot;.
         </Text>
         <ComplexByIndustryTable />
       </Stack>
@@ -4274,13 +4312,24 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Stack gap={10}>
         <H2 id="aggregate-method">Method &amp; caveats</H2>
         <Text size="small">
-          Complexity score is intentionally simple:{" "}
+          The complexity score is intentionally simple. Three things drive
+          it: how deep an org&apos;s site tree goes, how many product lines
+          they own, and how much they&apos;ve booked with us. Add those
+          three numbers together, sort the whole base, and the top 20%
+          is the &quot;complex tail&quot;. Below that, hierarchy design
+          mostly doesn&apos;t matter. Above it, every customer is
+          different enough that the deep-dives are worth your time.
+        </Text>
+        <Text size="small" tone="secondary">
+          (Method footnote: score ={" "}
           <Code>max_depth + product_lines_count + log10(lifetime_bookings)</Code>.
-          Each input is on a different scale (depth maxes at ~7, product lines
-          at 4, bookings up to ~$10M = 7), so the score lands in roughly 0-15
-          and the top-quintile cutoff comes out near 8. Use this view to
-          identify the cohorts that should drive design decisions; use the
-          customer deep-dives for representative trees inside those cohorts.
+          Each input is on a different scale (depth maxes at ~7, product
+          lines at 4, bookings up to ~$10M = 7), so the score lands in
+          roughly 0-15 and the top-quintile cutoff lands near 8. Cutoff
+          is a percentile rank, computed locally in TypeScript from
+          flat CSVs pulled via the Hex MCP against Athena. No
+          statistical model or machine learning; this is pure
+          aggregation.)
         </Text>
         <Text size="small" tone="secondary">
           Data pulled via the Hex MCP on{" "}
