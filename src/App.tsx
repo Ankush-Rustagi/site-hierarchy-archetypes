@@ -1605,19 +1605,19 @@ const archetypePatterns: { family: ArchetypeFamily; description: string; example
     family: "camera_only_flat",
     description:
       "Cameras only (no AC, no alarms) with a flat list of sites at depth 1. The dominant pattern in the active-paid population: most accounts that buy Verkada start here and stay here. Site tree is doing minimal work; the search and filter UX has to carry the load.",
-    examples: ["~54% of all accounts (population-wide)", "863 orgs in the complex tail"],
+    examples: [],
   },
   {
     family: "camera_only_geographic",
     description:
       "Cameras only, but with a real geographic tree (state, region, city) at depth 1+. Same single-product surface area as camera_only_flat but the customer is grouping by territory. Read this as a camera-only customer about to evolve toward access control or alarms.",
-    examples: ["148 orgs in the complex tail", "~$105M lifetime bookings"],
+    examples: [],
   },
   {
     family: "camera_only_deep",
     description:
       "Cameras only with 4+ levels of hierarchy. Rare but distinctive. Usually a single-product customer with a strong operational structure (chain retail, large logistics fleet) that has not yet adopted the rest of the security stack.",
-    examples: ["120 orgs in the complex tail", "~$95M lifetime bookings"],
+    examples: [],
   },
 ];
 
@@ -3283,28 +3283,149 @@ const CustomerComparisonTable = ({
   );
 };
 
+// Lookup: top bookings band per archetype family, computed once from the
+// complex-tail byBookingBand cross-tab. Tells us "where the money in this
+// archetype lives" at a glance.
+type BandConcentration = {
+  bandLabel: string;
+  shareOfFamilyBookings: number;
+  count: number;
+};
+const topBandByFamily: Record<string, BandConcentration | null> = (() => {
+  const bands = aggregateSnapshot.complexTail.byBookingBand;
+  const families = Object.keys(
+    aggregateSnapshot.complexTail.archetypeShares,
+  ) as ArchetypeFamily[];
+  const out: Record<string, BandConcentration | null> = {};
+  for (const fam of families) {
+    const totalBookings = (
+      aggregateSnapshot.complexTail.archetypeShares as Record<
+        string,
+        { bookings: number }
+      >
+    )[fam]?.bookings ?? 0;
+    if (totalBookings === 0) {
+      out[fam] = null;
+      continue;
+    }
+    let best: BandConcentration | null = null;
+    for (const b of bands) {
+      const cell = (
+        b.archetypeShares as Record<
+          string,
+          { count: number; bookings: number }
+        >
+      )[fam];
+      if (!cell) continue;
+      const share = cell.bookings / totalBookings;
+      if (!best || share > best.shareOfFamilyBookings) {
+        best = {
+          bandLabel: b.bandLabel,
+          shareOfFamilyBookings: share,
+          count: cell.count,
+        };
+      }
+    }
+    out[fam] = best;
+  }
+  return out;
+})();
+
 const ArchetypeFamilyCards = (): JSX.Element => {
+  const shares = aggregateSnapshot.complexTail.archetypeShares as Record<
+    string,
+    { count: number; share: number; bookings: number; bookingsShare: number }
+  >;
   return (
-    <Grid columns={2} gap={12}>
-      {archetypePatterns.map((a) => (
-        <Card key={a.family}>
-          <CardHeader trailing={<ArchetypePill family={a.family} />}>
-            {archetypeFamilyLabels[a.family]}
-          </CardHeader>
-          <CardBody>
-            <Stack gap={8}>
-              <Text size="small">{a.description}</Text>
-              <Row gap={6} wrap>
-                {a.examples.map((e) => (
-                  <Pill size="sm" key={e} tone="neutral">
-                    {e}
-                  </Pill>
-                ))}
-              </Row>
-            </Stack>
-          </CardBody>
-        </Card>
-      ))}
+    <Grid columns={2} gap={16}>
+      {archetypePatterns.map((a) => {
+        const s = shares[a.family];
+        const orgsInTail = s?.count ?? 0;
+        const shareOfTailOrgs = s?.share ?? 0;
+        const bookings = s?.bookings ?? 0;
+        const shareOfTailBookings = s?.bookingsShare ?? 0;
+        const medianPerOrg = orgsInTail > 0 ? bookings / orgsInTail : 0;
+        const topBand = topBandByFamily[a.family];
+        const tone = archetypeFamilyTone[a.family];
+        return (
+          <Card key={a.family}>
+            <CardHeader trailing={<ArchetypePill family={a.family} />}>
+              {archetypeFamilyLabels[a.family]}
+            </CardHeader>
+            <CardBody>
+              <Stack gap={14}>
+                {/* HEADLINE STATS: matches the visual cadence of the
+                    customer deep-dive panels. */}
+                <Grid columns={4} gap={10}>
+                  <Stat
+                    value={orgsInTail.toLocaleString()}
+                    label="Complex-tail orgs"
+                    tone={tone === "info" ? "info" : undefined}
+                  />
+                  <Stat
+                    value={`${(shareOfTailOrgs * 100).toFixed(1)}%`}
+                    label="of complex orgs"
+                  />
+                  <Stat
+                    value={fmtMoney(bookings)}
+                    label="Lifetime bookings"
+                    tone="success"
+                  />
+                  <Stat
+                    value={`${(shareOfTailBookings * 100).toFixed(1)}%`}
+                    label="of complex bookings"
+                  />
+                </Grid>
+
+                {/* SECONDARY STATS: per-org economics + concentration */}
+                <Row gap={20} wrap>
+                  <Stack gap={2}>
+                    <Text size="small" tone="secondary">
+                      Avg bookings per org
+                    </Text>
+                    <Text size="small" weight="semibold">
+                      {fmtMoney(medianPerOrg)}
+                    </Text>
+                  </Stack>
+                  {topBand ? (
+                    <Stack gap={2}>
+                      <Text size="small" tone="secondary">
+                        Where the money concentrates
+                      </Text>
+                      <Row gap={6} align="center">
+                        <Text size="small" weight="semibold">
+                          {topBand.bandLabel}
+                        </Text>
+                        <Text size="small" tone="secondary">
+                          ({(topBand.shareOfFamilyBookings * 100).toFixed(0)}%
+                          of this archetype's bookings · {topBand.count} orgs)
+                        </Text>
+                      </Row>
+                    </Stack>
+                  ) : null}
+                </Row>
+
+                <Text size="small">{a.description}</Text>
+
+                {a.examples.length > 0 ? (
+                  <Stack gap={4}>
+                    <Text size="small" weight="semibold" tone="secondary">
+                      EXAMPLES IN THE DEEP-DIVE SET
+                    </Text>
+                    <Row gap={6} wrap>
+                      {a.examples.map((e) => (
+                        <Pill size="sm" key={e} tone="neutral">
+                          {e}
+                        </Pill>
+                      ))}
+                    </Row>
+                  </Stack>
+                ) : null}
+              </Stack>
+            </CardBody>
+          </Card>
+        );
+      })}
     </Grid>
   );
 };
