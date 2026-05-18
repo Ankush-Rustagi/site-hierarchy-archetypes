@@ -2439,6 +2439,8 @@ function CustomerDetail({
         </CardBody>
       </Card>
 
+      <CustomerSpatialFingerprint customerName={c.name} />
+
       {/* STATS: grouped into Scope and Devices with section labels */}
       <Stack gap={6}>
         <Text size="small" weight="semibold" tone="secondary">
@@ -4755,6 +4757,329 @@ const BookingsTierIndustryCards = (): JSX.Element => {
 };
 
 // ---------------------------------------------------------------------------
+// Property schematics: how customers describe a property.
+//
+// Renders taxonomy.json.spatialVocabulary. Two callers:
+//   PropertySchematicsPanel - aggregate VIEW, overall + per-industry.
+//   CustomerSpatialFingerprint - customer deep-dive, per-org rollup.
+// ---------------------------------------------------------------------------
+
+type SpatialVocabularyShape = {
+  totalEligibleNodes: number;
+  compoundPatternShares: Record<string, number>;
+  qualifierFamilyShares: Record<string, number>;
+  topQualifierLabels: { label: string; share: number; count: number }[];
+  embeddedIdShare: number;
+};
+
+type SpatialVocabularyRoot = {
+  qualifierFamilyLabels: Record<string, string>;
+  methodNote: string;
+  overall: SpatialVocabularyShape;
+  byIndustry: Record<string, SpatialVocabularyShape>;
+  byDeepDiveCustomer: Record<string, SpatialVocabularyShape>;
+};
+
+const spatialVocab = (taxonomySnapshot as unknown as {
+  spatialVocabulary?: SpatialVocabularyRoot;
+}).spatialVocabulary;
+
+const compoundPatternLabels: Record<string, string> = {
+  entity_only: "Just a name (no spatial qualifier)",
+  entity_plus_qualifier: "Name + spatial qualifier",
+  entity_plus_qualifier_plus_id: "Name + qualifier + embedded ID",
+  qualifier_only: "Qualifier only (no parent name)",
+  id_only: "ID only",
+};
+
+function CompoundPatternBar({
+  shares,
+}: {
+  shares: Record<string, number>;
+}): JSX.Element {
+  const order = [
+    "entity_only",
+    "entity_plus_qualifier",
+    "entity_plus_qualifier_plus_id",
+    "qualifier_only",
+    "id_only",
+  ];
+  const palette: Record<string, string> = {
+    entity_only: "rgba(148, 163, 184, 0.55)",
+    entity_plus_qualifier: "rgba(74, 222, 128, 0.6)",
+    entity_plus_qualifier_plus_id: "rgba(59, 130, 246, 0.6)",
+    qualifier_only: "rgba(251, 191, 36, 0.6)",
+    id_only: "rgba(244, 114, 182, 0.6)",
+  };
+  return (
+    <Stack gap={6}>
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: 14,
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
+      >
+        {order.map((p) => {
+          const v = shares[p] ?? 0;
+          if (v < 0.001) return null;
+          return (
+            <div
+              key={p}
+              style={{
+                width: `${v * 100}%`,
+                background: palette[p],
+              }}
+              title={`${compoundPatternLabels[p]}: ${(v * 100).toFixed(1)}%`}
+            />
+          );
+        })}
+      </div>
+      <Row gap={10} wrap>
+        {order.map((p) => {
+          const v = shares[p] ?? 0;
+          if (v < 0.001) return null;
+          return (
+            <Row key={p} gap={4} align="center">
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: palette[p],
+                  display: "inline-block",
+                }}
+              />
+              <Text size="small" tone="secondary">
+                {compoundPatternLabels[p]} {(v * 100).toFixed(1)}%
+              </Text>
+            </Row>
+          );
+        })}
+      </Row>
+    </Stack>
+  );
+}
+
+function QualifierFamilyList({
+  shares,
+  labels,
+}: {
+  shares: Record<string, number>;
+  labels: Record<string, string>;
+}): JSX.Element {
+  const rows = Object.entries(shares)
+    .filter(([k]) => k !== "none")
+    .filter(([, v]) => v >= 0.005)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+  if (rows.length === 0) {
+    return (
+      <Text size="small" tone="secondary">
+        No qualifier families above 0.5% share in this slice.
+      </Text>
+    );
+  }
+  const maxShare = rows[0][1];
+  return (
+    <Stack gap={4}>
+      {rows.map(([fam, share]) => (
+        <Row key={fam} gap={10} align="center">
+          <div style={{ width: 200, minWidth: 200 }}>
+            <Text size="small" weight="semibold">
+              {labels[fam] ?? fam}
+            </Text>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              height: 10,
+              background: "rgba(148, 163, 184, 0.15)",
+              borderRadius: 2,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${(share / maxShare) * 100}%`,
+                height: "100%",
+                background: "rgba(74, 222, 128, 0.55)",
+              }}
+            />
+          </div>
+          <Text size="small" tone="secondary">
+            {(share * 100).toFixed(1)}%
+          </Text>
+        </Row>
+      ))}
+    </Stack>
+  );
+}
+
+const PropertySchematicsPanel = (): JSX.Element | null => {
+  if (!spatialVocab) return null;
+  const o = spatialVocab.overall;
+  const industries = Object.entries(spatialVocab.byIndustry)
+    .sort((a, b) => b[1].totalEligibleNodes - a[1].totalEligibleNodes);
+  return (
+    <Stack gap={16}>
+      <Card>
+        <CardHeader>Overall: how customers compose a name</CardHeader>
+        <CardBody>
+          <Stack gap={14}>
+            <Text size="small" tone="secondary">
+              Across {o.totalEligibleNodes.toLocaleString()} sub-roots
+              (depth-2 and below) in the complex tail, here is how often a
+              name carries a spatial qualifier vs. just an entity name.
+            </Text>
+            <CompoundPatternBar shares={o.compoundPatternShares} />
+            <Stack gap={6}>
+              <Text size="small" weight="semibold">
+                Top spatial-qualifier families
+              </Text>
+              <QualifierFamilyList
+                shares={o.qualifierFamilyShares}
+                labels={spatialVocab.qualifierFamilyLabels}
+              />
+            </Stack>
+            <Stack gap={6}>
+              <Text size="small" weight="semibold">
+                Top qualifier labels (raw)
+              </Text>
+              <Row gap={6} wrap>
+                {o.topQualifierLabels.slice(0, 10).map((l) => (
+                  <Pill
+                    key={l.label}
+                    size="sm"
+                    tone="neutral"
+                    title={`${l.count.toLocaleString()} nodes, ${(l.share * 100).toFixed(2)}% of eligible`}
+                  >
+                    {l.label} ({(l.share * 100).toFixed(1)}%)
+                  </Pill>
+                ))}
+              </Row>
+            </Stack>
+            <Text size="small" tone="secondary">
+              Embedded ID suffixes (e.g. <Code>(102)</Code> or
+              <Code> - ABC123</Code>) appear on{" "}
+              {(o.embeddedIdShare * 100).toFixed(1)}% of eligible nodes.
+            </Text>
+          </Stack>
+        </CardBody>
+      </Card>
+
+      <Stack gap={10}>
+        <H3>By industry</H3>
+        <Text size="small" tone="secondary">
+          One card per industry with at least 200 eligible nodes. The
+          qualifier families show which on-property vocabulary each
+          industry leans on most.
+        </Text>
+        <Grid columns={2} gap={16}>
+          {industries.map(([ind, vocab]) => (
+            <Card key={ind}>
+              <CardHeader>{ind}</CardHeader>
+              <CardBody>
+                <Stack gap={10}>
+                  <Text size="small" tone="secondary">
+                    {vocab.totalEligibleNodes.toLocaleString()} eligible
+                    nodes ·{" "}
+                    {(
+                      ((vocab.compoundPatternShares["entity_plus_qualifier"] ??
+                        0) +
+                        (vocab.compoundPatternShares["qualifier_only"] ?? 0) +
+                        (vocab.compoundPatternShares[
+                          "entity_plus_qualifier_plus_id"
+                        ] ?? 0)) *
+                      100
+                    ).toFixed(1)}
+                    % carry a spatial qualifier
+                  </Text>
+                  <CompoundPatternBar shares={vocab.compoundPatternShares} />
+                  <QualifierFamilyList
+                    shares={vocab.qualifierFamilyShares}
+                    labels={spatialVocab.qualifierFamilyLabels}
+                  />
+                </Stack>
+              </CardBody>
+            </Card>
+          ))}
+        </Grid>
+        <Text size="small" tone="secondary">
+          Method: pure regex over node names. Each non-root node (depth 2+)
+          is parsed for an entity prefix and an optional spatial-qualifier
+          tail (interior / exterior / front / north / loading dock / lobby /
+          etc.). Qualifier families roll up 17 named buckets. No model.
+        </Text>
+      </Stack>
+    </Stack>
+  );
+};
+
+// App.tsx uses short customer names. taxonomy.json keys come from the raw
+// SFDC account name and don't always match. This map normalizes the few
+// known discrepancies.
+const CUSTOMER_NAME_TO_TAXONOMY_KEY: Record<string, string> = {
+  "Saddle Creek Logistics": "Saddle Creek Logistics Services",
+  "Salvation Army - Western Territory":
+    "The Salvation Army - Western Territory",
+  "Dairy Farmers of America": "Dairy Farmers of America , Inc.",
+};
+
+function CustomerSpatialFingerprint({
+  customerName,
+}: {
+  customerName: string;
+}): JSX.Element | null {
+  if (!spatialVocab) return null;
+  const key = CUSTOMER_NAME_TO_TAXONOMY_KEY[customerName] ?? customerName;
+  const vocab = spatialVocab.byDeepDiveCustomer[key];
+  if (!vocab || vocab.totalEligibleNodes < 30) return null;
+  const qualifierShare =
+    (vocab.compoundPatternShares["entity_plus_qualifier"] ?? 0) +
+    (vocab.compoundPatternShares["qualifier_only"] ?? 0) +
+    (vocab.compoundPatternShares["entity_plus_qualifier_plus_id"] ?? 0);
+  return (
+    <Card>
+      <CardHeader>Spatial vocabulary fingerprint</CardHeader>
+      <CardBody>
+        <Stack gap={12}>
+          <Text size="small" tone="secondary">
+            How this customer composes sub-root names (depth-2 and below).
+            Based on {vocab.totalEligibleNodes.toLocaleString()} eligible
+            nodes. {(qualifierShare * 100).toFixed(1)}% of them carry a
+            spatial qualifier (interior / exterior / lobby / dock /
+            cardinal direction / etc.).
+          </Text>
+          <CompoundPatternBar shares={vocab.compoundPatternShares} />
+          {vocab.topQualifierLabels.length > 0 ? (
+            <Stack gap={6}>
+              <Text size="small" weight="semibold">
+                Most common qualifiers this customer uses
+              </Text>
+              <Row gap={6} wrap>
+                {vocab.topQualifierLabels.slice(0, 8).map((l) => (
+                  <Pill
+                    key={l.label}
+                    size="sm"
+                    tone="neutral"
+                    title={`${l.count.toLocaleString()} nodes`}
+                  >
+                    {l.label} ({(l.share * 100).toFixed(1)}%)
+                  </Pill>
+                ))}
+              </Row>
+            </Stack>
+          ) : null}
+        </Stack>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Top complex orgs by bookings.
 
 const TopComplexOrgsTable = (): JSX.Element => {
@@ -4898,7 +5223,21 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Divider />
 
       <Stack gap={10}>
-        <H2 id="complex-matrix">5. By bookings band</H2>
+        <H2 id="property-schematics">5. Property schematics</H2>
+        <Text size="small" tone="secondary">
+          Below the top-level facility name, customers describe property
+          schematics with a small spatial vocabulary: inside vs outside,
+          front vs back, entrance and lobby, loading dock, yard, parking,
+          and cardinal directions. This section shows how dominant each
+          family is overall, and how the mix shifts by industry.
+        </Text>
+        <PropertySchematicsPanel />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="complex-matrix">6. By bookings band</H2>
         <Text size="small" tone="secondary">
           One card per bookings band inside the complex tail. Each card shows
           the top five industries in that band and the most common hierarchy
@@ -4911,7 +5250,7 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
       <Divider />
 
       <Stack gap={10}>
-        <H2 id="complex-top-orgs">6. Top high-value complex orgs</H2>
+        <H2 id="complex-top-orgs">7. Top high-value complex orgs</H2>
         <TopComplexOrgsTable />
       </Stack>
 

@@ -49,12 +49,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   classifyNodeName,
+  detectCompoundPattern,
+  qualifierFamilyLabels,
   TopShape,
   TOP_SHAPES,
   SubCode,
   topShapeLabels,
   subCodeLabels,
   subCodeToTopShape,
+  type CompoundPattern,
+  type QualifierFamily,
 } from "./classifier.ts";
 import { classifySubSegment, segmentsFor, SUB_SEGMENTERS } from "./subsegments.ts";
 
@@ -165,6 +169,10 @@ type Node = {
   siteName: string;
   topShape: TopShape;
   subCode: SubCode;
+  compoundPattern: CompoundPattern;
+  qualifierFamily: QualifierFamily | null;
+  qualifierLabel: string | null;
+  hasEmbeddedId: boolean;
 };
 
 function num(s: string): number {
@@ -182,6 +190,7 @@ console.log(`  ${rows.length.toLocaleString()} site rows loaded`);
 
 const nodes: Node[] = rows.map((r) => {
   const c = classifyNodeName(r.site_name);
+  const cp = detectCompoundPattern(r.site_name);
   return {
     sfdcAccountId: r.sfdc_account_id,
     organizationId: r.organization_id,
@@ -189,6 +198,10 @@ const nodes: Node[] = rows.map((r) => {
     siteName: r.site_name,
     topShape: c.shape,
     subCode: c.sub,
+    compoundPattern: cp.compoundPattern,
+    qualifierFamily: cp.qualifierFamily,
+    qualifierLabel: cp.qualifierLabel,
+    hasEmbeddedId: cp.embeddedId !== null,
   };
 });
 
@@ -1126,6 +1139,130 @@ const featuredCardData = featuredCards.map((c) => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// Spatial vocabulary: how do customers describe property schematics?
+// Rollup of compound-pattern fields and qualifier-family shares across:
+//   1. The full complex-tail population
+//   2. Per industry
+//   3. Per deep-dive customer (12 hand-picked)
+//
+// Only nodes at depth >= 2 are counted, since the "schematic" pattern is
+// about sub-roots inside a building/site, not the top-level facility name.
+// ---------------------------------------------------------------------------
+
+type SpatialRollup = {
+  totalEligibleNodes: number;
+  compoundPatternShares: Record<CompoundPattern, number>;
+  qualifierFamilyShares: Record<QualifierFamily | "none", number>;
+  topQualifierLabels: { label: string; share: number; count: number }[];
+  embeddedIdShare: number;
+};
+
+const ALL_COMPOUND_PATTERNS: CompoundPattern[] = [
+  "entity_only",
+  "entity_plus_qualifier",
+  "entity_plus_qualifier_plus_id",
+  "qualifier_only",
+  "id_only",
+];
+
+function spatialRollup(items: Node[]): SpatialRollup {
+  const eligible = items.filter((n) => n.depth >= 2);
+  const total = eligible.length;
+  const cp: Record<CompoundPattern, number> = {
+    entity_only: 0,
+    entity_plus_qualifier: 0,
+    entity_plus_qualifier_plus_id: 0,
+    qualifier_only: 0,
+    id_only: 0,
+  };
+  const qf: Record<string, number> = { none: 0 };
+  const labelCounts = new Map<string, number>();
+  let embeddedIdNodes = 0;
+  for (const n of eligible) {
+    cp[n.compoundPattern] = (cp[n.compoundPattern] ?? 0) + 1;
+    const fam = n.qualifierFamily ?? "none";
+    qf[fam] = (qf[fam] ?? 0) + 1;
+    if (n.qualifierLabel) {
+      labelCounts.set(
+        n.qualifierLabel,
+        (labelCounts.get(n.qualifierLabel) ?? 0) + 1,
+      );
+    }
+    if (n.hasEmbeddedId) embeddedIdNodes++;
+  }
+  const cpShares: Record<CompoundPattern, number> = {
+    entity_only: 0,
+    entity_plus_qualifier: 0,
+    entity_plus_qualifier_plus_id: 0,
+    qualifier_only: 0,
+    id_only: 0,
+  };
+  for (const p of ALL_COMPOUND_PATTERNS) {
+    cpShares[p] = total > 0 ? +(cp[p] / total).toFixed(4) : 0;
+  }
+  const qfShares: Record<string, number> = {};
+  for (const k of Object.keys(qf)) {
+    qfShares[k] = total > 0 ? +(qf[k] / total).toFixed(4) : 0;
+  }
+  const topLabels = Array.from(labelCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([label, count]) => ({
+      label,
+      count,
+      share: total > 0 ? +(count / total).toFixed(4) : 0,
+    }));
+  return {
+    totalEligibleNodes: total,
+    compoundPatternShares: cpShares,
+    qualifierFamilyShares: qfShares as Record<QualifierFamily | "none", number>,
+    topQualifierLabels: topLabels,
+    embeddedIdShare: total > 0 ? +(embeddedIdNodes / total).toFixed(4) : 0,
+  };
+}
+
+const spatialOverall = spatialRollup(nodes);
+const spatialByIndustry: Record<string, SpatialRollup> = {};
+for (const [ind, items] of byIndustryNodes.entries()) {
+  if (ind === "Unknown / Other") continue;
+  const roll = spatialRollup(items);
+  if (roll.totalEligibleNodes < 200) continue; // sample-size guard
+  spatialByIndustry[ind] = roll;
+}
+
+// Per deep-dive customer (12 hand-picked accounts). Index by sfdc_account_name
+// since the App.tsx lookup uses the canonical name.
+const DEEP_DIVE_NAMES = [
+  "Caterpillar Inc",
+  "Saddle Creek Logistics Services",
+  "Tacoma Public Schools",
+  "Legislative Assembly of British Columbia",
+  "SGS (US)",
+  "Hanna Boys Center",
+  "Mount Pisgah Christian School (GA)",
+  "The Salvation Army - Western Territory",
+  "Charter Schools USA",
+  "Southwire Company LLC",
+  "Dairy Farmers of America , Inc.",
+  "Hanger, Inc.",
+];
+
+const nodesByAccountName = new Map<string, Node[]>();
+for (const n of nodes) {
+  const ax = axesByAccount.get(n.sfdcAccountId);
+  if (!ax) continue;
+  const list = nodesByAccountName.get(ax.name) ?? [];
+  list.push(n);
+  nodesByAccountName.set(ax.name, list);
+}
+const spatialByDeepDive: Record<string, SpatialRollup> = {};
+for (const name of DEEP_DIVE_NAMES) {
+  const items = nodesByAccountName.get(name) ?? [];
+  if (items.length === 0) continue;
+  spatialByDeepDive[name] = spatialRollup(items);
+}
+
 const payload = {
   pulledAt: new Date().toISOString().slice(0, 10),
   totalNodes: nodes.length,
@@ -1233,6 +1370,23 @@ const payload = {
   subSegmentDefinitions: Object.fromEntries(
     SUB_SEGMENTERS.map((s) => [s.industry, s.segments]),
   ),
+  // Spatial vocabulary: how customers compose property-schematics names
+  // (entity + qualifier pattern, qualifier-family shares, top labels).
+  // Sourced from depth-2+ nodes only (top-level facility roots excluded).
+  spatialVocabulary: {
+    qualifierFamilyLabels,
+    methodNote:
+      "Pattern detector splits each non-root node name (depth >= 2) into " +
+      "an entity prefix and an optional spatial-qualifier tail. The " +
+      "qualifier family rolls up to one of 17 named buckets (inside / " +
+      "outside, direction relative or cardinal, entry / exit, dock, " +
+      "gate / yard, parking, etc.). Pure regex over node names; no model. " +
+      "Industries with under 200 eligible nodes are omitted for sample " +
+      "size.",
+    overall: spatialOverall,
+    byIndustry: spatialByIndustry,
+    byDeepDiveCustomer: spatialByDeepDive,
+  },
 };
 
 writeFileSync(OUT, JSON.stringify(payload) + "\n");

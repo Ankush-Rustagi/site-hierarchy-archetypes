@@ -131,6 +131,14 @@ export type SubCode =
   | "lab_research"
   | "zone_area"
   | "elevator_stair"
+  // spatial - finer granularity (added May 2026 from population sampling)
+  | "direction_relative"
+  | "direction_cardinal"
+  | "entry_exit"
+  | "dock"
+  | "gate_yard"
+  | "parking_garage"
+  | "circulation"
   // device
   | "device_zone"
   | "alarm_subpanel"
@@ -189,6 +197,13 @@ export const subCodeLabels: Record<SubCode, string> = {
   lab_research: "lab / research",
   zone_area: "zone / area / sector",
   elevator_stair: "elevator / stairwell",
+  direction_relative: "relative direction (front / back / side / rear / main)",
+  direction_cardinal: "cardinal direction (N / S / E / W / NE / NW / SE / SW)",
+  entry_exit: "entrance / exit / lobby / reception / vestibule",
+  dock: "loading dock / shipping / receiving",
+  gate_yard: "gate / yard / lot / courtyard / quad / grounds",
+  parking_garage: "parking lot / garage / carport",
+  circulation: "hallway / corridor / stairs / elevator",
   device_zone: "device-type zone",
   alarm_subpanel: "alarm sub-panel",
   org_unit: "division / territory / region / group",
@@ -247,6 +262,13 @@ export const subCodeToTopShape: Record<SubCode, TopShape> = {
   lab_research: "spatial",
   zone_area: "spatial",
   elevator_stair: "spatial",
+  direction_relative: "spatial",
+  direction_cardinal: "spatial",
+  entry_exit: "spatial",
+  dock: "spatial",
+  gate_yard: "spatial",
+  parking_garage: "spatial",
+  circulation: "spatial",
   device_zone: "device",
   alarm_subpanel: "device",
   org_unit: "corporate",
@@ -431,17 +453,48 @@ export function classifyNodeName(name: string): { shape: TopShape; sub: SubCode 
   if (testI(/^Building\s+[A-Z0-9]{1,3}\b/, t) || testI(/^Bldg\.?\s+[A-Z0-9]{1,3}\b/, t) || testI(/^[A-Z]-(Building|Bldg|Wing|Block)\b/, t) || testI(/^(Wing|Block)\s+[A-Z0-9]{1,3}\b/, t)) {
     return { shape: "spatial", sub: "building_letter" };
   }
-  if (testI(/^(North|South|East|West|NE|NW|SE|SW)\b/, t)) {
-    return { shape: "spatial", sub: "cardinal" };
+  // Cardinal direction: full word, OR 2-letter (NE/NW/SE/SW), OR single
+  // letter (N/S/E/W) followed by separator. The finer-grained
+  // direction_cardinal supersedes the older `cardinal` for new
+  // classifications. `cardinal` stays defined for backward compatibility
+  // in any cached snapshots.
+  if (testI(/^(North|South|East|West|Northeast|Northwest|Southeast|Southwest|NE|NW|SE|SW)\b/, t)) {
+    return { shape: "spatial", sub: "direction_cardinal" };
   }
-  if (testI(/\b(Lobby|Reception|Entrance|Entry|Vestibule|Foyer)\b/, t)) {
-    return { shape: "spatial", sub: "lobby_entry" };
+  if (test(/\b(NE|NW|SE|SW)\b/, t) && t.split(/\s+/).length <= 4) {
+    return { shape: "spatial", sub: "direction_cardinal" };
   }
+  // Relative direction: front/back/rear/side/main as the dominant
+  // descriptor for a sub-node. Constrained to short names to avoid
+  // matching "Front Office Building" (which would already match office_hq
+  // or a named-function rule above).
+  if (
+    testI(/\b(Front|Back|Rear|Side)\b/, t) &&
+    !testI(/\bOffice\b/, t) &&
+    t.split(/\s+/).length <= 5
+  ) {
+    return { shape: "spatial", sub: "direction_relative" };
+  }
+  // Entry / exit / lobby - the "front door" cluster.
+  if (testI(/\b(Lobby|Reception|Entrance|Entry|Exit|Vestibule|Foyer|Atrium)\b/, t)) {
+    return { shape: "spatial", sub: "entry_exit" };
+  }
+  // Parking & garage.
   if (testI(/\b(Parking\s+Lot|Parking\s+Garage|Parking\s+Structure|Parking|Garage|Carport)\b/, t)) {
-    return { shape: "spatial", sub: "parking" };
+    return { shape: "spatial", sub: "parking_garage" };
   }
-  if (testI(/\b(Loading\s+Dock|Dock\s+\d|Gate\s+\d|Shipping|Receiving)\b/, t)) {
-    return { shape: "spatial", sub: "dock_gate" };
+  // Dock cluster: loading/shipping/receiving and explicit dock.
+  if (testI(/\b(Loading\s+Dock|Loading|Dock\s+\d|Docks?|Shipping|Receiving)\b/, t)) {
+    return { shape: "spatial", sub: "dock" };
+  }
+  // Gate / yard / lot cluster: exterior partitioning. Excludes "Parking
+  // Lot" (already caught above as parking_garage).
+  if (testI(/\b(Gate\s+\d|Gates?|Yard|Courtyard|Quad(?:rangle)?|Grounds|Field|Lot)\b/, t)) {
+    return { shape: "spatial", sub: "gate_yard" };
+  }
+  // Circulation: stairs, elevator, hallway.
+  if (testI(/\b(Hallway|Corridor|Stairwell|Stairway|Stairs|Elevator)\b/, t)) {
+    return { shape: "spatial", sub: "circulation" };
   }
   if (testI(/\b(Cafeteria|Cafe|Kitchen|Dining|Galley|Break\s+Room)\b/, t)) {
     return { shape: "spatial", sub: "cafe_kitchen" };
@@ -455,9 +508,10 @@ export function classifyNodeName(name: string): { shape: TopShape; sub: SubCode 
   if (testI(/\b(Zone\s+[A-Z0-9]|Area\s+[A-Z0-9]|Sector\s+[A-Z0-9]|Quadrant|Bay\s+\d)\b/, t)) {
     return { shape: "spatial", sub: "zone_area" };
   }
-  if (testI(/\b(Elevator|Stairwell|Stairway|Stairs)\b/, t)) {
-    return { shape: "spatial", sub: "elevator_stair" };
-  }
+  // elevator/stair caught above by `circulation`. The older `elevator_stair`
+  // and `cardinal` / `lobby_entry` / `parking` / `dock_gate` sub-codes
+  // remain in the SubCode union for backward compatibility with cached
+  // snapshots but are no longer emitted by the classifier.
   // Bare room number "101 - Suite 101", "316 - Facilities".
   if (test(/^\d{2,5}\s*-\s*[A-Z]/, t) || test(/^\d{3,5}\b/, t)) {
     return { shape: "spatial", sub: "room_numbered" };
@@ -487,6 +541,227 @@ export function classifyNodeName(name: string): { shape: TopShape; sub: SubCode 
 
   // ---- entity (catch-all) ----
   return { shape: "entity", sub: "named" };
+}
+
+// ---------------------------------------------------------------------------
+// Compound pattern detector.
+//
+// Recognizes when a node name is structured as a compound:
+//   <named-entity> + <spatial-qualifier> [+ <embedded-id>]
+//
+// Examples from real data:
+//   "Mental Health Hub Exterior (102)"
+//      -> entity="Mental Health Hub", qualifier="Exterior",
+//         id="(102)", pattern="entity_plus_qualifier_plus_id"
+//   "Building A Exterior"
+//      -> entity="Building A", qualifier="Exterior",
+//         pattern="entity_plus_qualifier"
+//   "Front Lobby"
+//      -> qualifier="Lobby" (after stripping leading direction "Front"),
+//         pattern="qualifier_only"
+//   "FLLAK South Lot"
+//      -> entity="FLLAK", qualifier="South Lot",
+//         pattern="entity_plus_qualifier"
+//
+// The intent is to give the dashboard a "schematics-of-a-property" view:
+// how often customers compose names from a building/place identifier and
+// a spatial location within it.
+// ---------------------------------------------------------------------------
+
+export type CompoundPattern =
+  | "entity_only"
+  | "entity_plus_qualifier"
+  | "entity_plus_qualifier_plus_id"
+  | "qualifier_only"
+  | "id_only";
+
+// Qualifier family used in the compound output. Coarser than SubCode so
+// it rolls up cleanly across industries.
+export type QualifierFamily =
+  | "inside_outside"
+  | "direction_relative"
+  | "direction_cardinal"
+  | "entry_exit"
+  | "dock"
+  | "gate_yard"
+  | "parking_garage"
+  | "circulation"
+  | "kitchen_break"
+  | "office_admin"
+  | "warehouse_floor"
+  | "lab_research"
+  | "building_letter"
+  | "floor"
+  | "room"
+  | "it_data_room"
+  | "zone";
+
+export const qualifierFamilyLabels: Record<QualifierFamily, string> = {
+  inside_outside: "inside / outside",
+  direction_relative: "front / back / side / rear",
+  direction_cardinal: "cardinal direction (N / S / E / W)",
+  entry_exit: "entry / exit / lobby",
+  dock: "loading dock / shipping / receiving",
+  gate_yard: "gate / yard / lot / grounds",
+  parking_garage: "parking / garage",
+  circulation: "hallway / stairs / elevator",
+  kitchen_break: "kitchen / cafe / break room",
+  office_admin: "office / admin / HQ",
+  warehouse_floor: "warehouse / production floor",
+  lab_research: "lab / research",
+  building_letter: "building letter / wing",
+  floor: "floor (ordinal or named)",
+  room: "room / suite",
+  it_data_room: "IT closet / data center",
+  zone: "zone / area / sector",
+};
+
+// Tail-of-name spatial qualifiers, ordered most-specific first so the
+// regex doesn't false-match a directional inside a longer phrase.
+// Each entry returns the family AND a normalized label for display.
+const QUALIFIER_TAILS: Array<{
+  rx: RegExp;
+  family: QualifierFamily;
+  label: string;
+}> = [
+  // Inside/outside (high-volume, ~8% of population)
+  { rx: /\b(Interior|Indoor|Inside)\b\s*$/i, family: "inside_outside", label: "Interior" },
+  { rx: /\b(Exterior|Outdoor|Outside)\b\s*$/i, family: "inside_outside", label: "Exterior" },
+  { rx: /\b(Perimeter|Fence(?:line)?)\b\s*$/i, family: "inside_outside", label: "Perimeter" },
+  { rx: /\b(Roof(?:top)?)\b\s*$/i, family: "inside_outside", label: "Roof" },
+  // Entry / exit
+  { rx: /\b(Main\s+Entrance|Front\s+Entrance|Rear\s+Entrance|Side\s+Entrance|Entrance)\b\s*$/i, family: "entry_exit", label: "Entrance" },
+  { rx: /\b(Main\s+Lobby|Front\s+Lobby|Lobby)\b\s*$/i, family: "entry_exit", label: "Lobby" },
+  { rx: /\b(Reception|Vestibule|Foyer|Atrium)\b\s*$/i, family: "entry_exit", label: "Reception" },
+  { rx: /\b(Exit)\b\s*$/i, family: "entry_exit", label: "Exit" },
+  // Dock cluster
+  { rx: /\b(Loading\s+Dock|Loading)\b\s*$/i, family: "dock", label: "Loading" },
+  { rx: /\b(Shipping|Receiving|Dock(?:s)?)\b\s*$/i, family: "dock", label: "Dock" },
+  // Gate / yard / grounds
+  { rx: /\b(Gate(?:s|house)?)\b\s*$/i, family: "gate_yard", label: "Gate" },
+  { rx: /\b(Courtyard|Quad|Grounds|Yard|Field)\b\s*$/i, family: "gate_yard", label: "Yard" },
+  // Parking / garage
+  { rx: /\b(Parking\s+Lot|Parking\s+Garage|Parking|Garage|Carport)\b\s*$/i, family: "parking_garage", label: "Parking" },
+  // Bare "Lot" only if it's not "Parking Lot" (caught above)
+  { rx: /\bLot\b\s*$/i, family: "gate_yard", label: "Lot" },
+  // Directional (relative) - front/back/rear/side
+  { rx: /\b(Front|Back|Rear|Side)\b\s*$/i, family: "direction_relative", label: "Front/Back/Side" },
+  // Directional (cardinal) - 2-letter or single-letter at end
+  { rx: /\b(Northeast|Northwest|Southeast|Southwest|NE|NW|SE|SW)\b\s*$/i, family: "direction_cardinal", label: "Cardinal (NE/NW/SE/SW)" },
+  { rx: /\b(North|South|East|West)\b\s*$/i, family: "direction_cardinal", label: "Cardinal (N/S/E/W)" },
+  // Circulation
+  { rx: /\b(Hallway|Corridor|Stairwell|Stairway|Stairs|Elevator)\b\s*$/i, family: "circulation", label: "Hallway / Stairs" },
+  // Kitchen / break room
+  { rx: /\b(Cafeteria|Cafe|Kitchen|Dining|Break\s+Room)\b\s*$/i, family: "kitchen_break", label: "Kitchen" },
+  // Office / admin tail
+  { rx: /\b(Office|Admin|HQ|Administration)\b\s*$/i, family: "office_admin", label: "Office" },
+  // Warehouse / production
+  { rx: /\b(Warehouse|Production|Plant|Mill|Factory)\b\s*$/i, family: "warehouse_floor", label: "Warehouse" },
+  // Lab
+  { rx: /\b(Lab(?:oratory)?)\b\s*$/i, family: "lab_research", label: "Lab" },
+  // IT / data room
+  { rx: /\b(MDF|IDF|Server\s+Room|Data\s+Center|IT\s+Closet)\b\s*$/i, family: "it_data_room", label: "IT Closet" },
+  // Building letter / wing
+  { rx: /\b(Building\s+[A-Z0-9]|Wing\s+[A-Z0-9]|Block\s+[A-Z0-9])\s*$/i, family: "building_letter", label: "Building/Wing" },
+  // Floor (ordinal at end)
+  { rx: /\b\d{1,2}(st|nd|rd|th)?\s+Floor\b\s*$/i, family: "floor", label: "Floor" },
+  // Zone
+  { rx: /\b(Zone\s+[A-Z0-9]|Area\s+[A-Z0-9]|Bay\s+\d)\s*$/i, family: "zone", label: "Zone" },
+];
+
+// Embedded-id patterns at the very end of the name.
+const EMBEDDED_ID_PATTERNS: Array<{ rx: RegExp; kind: string }> = [
+  { rx: /\s*(\([A-Z0-9][A-Z0-9\-]{1,12}\))\s*$/, kind: "paren" }, // (102), (ABC-123)
+  { rx: /\s*[-]\s*([A-Z0-9]{3,10})\s*$/, kind: "dash" }, // - ABC123
+];
+
+export type CompoundResult = {
+  compoundPattern: CompoundPattern;
+  entityToken: string | null;
+  qualifierLabel: string | null;
+  qualifierFamily: QualifierFamily | null;
+  embeddedId: string | null;
+};
+
+export function detectCompoundPattern(name: string): CompoundResult {
+  const original = (name || "").trim();
+  if (original.length === 0) {
+    return {
+      compoundPattern: "entity_only",
+      entityToken: null,
+      qualifierLabel: null,
+      qualifierFamily: null,
+      embeddedId: null,
+    };
+  }
+  // Strip a trailing embedded id first so the qualifier can match the
+  // word right before it (e.g. "...Exterior (102)" -> qualifier="Exterior",
+  // id="(102)").
+  let working = original;
+  let embeddedId: string | null = null;
+  for (const idp of EMBEDDED_ID_PATTERNS) {
+    const m = working.match(idp.rx);
+    if (m) {
+      embeddedId = m[1];
+      working = working.slice(0, m.index).trim();
+      break;
+    }
+  }
+
+  // Now look for a qualifier tail in the (id-stripped) name.
+  let matchedFamily: QualifierFamily | null = null;
+  let matchedLabel: string | null = null;
+  let qualifierStart = -1;
+  let qualifierLen = 0;
+  for (const q of QUALIFIER_TAILS) {
+    const m = working.match(q.rx);
+    if (m && typeof m.index === "number") {
+      matchedFamily = q.family;
+      matchedLabel = q.label;
+      qualifierStart = m.index;
+      qualifierLen = m[0].length;
+      break;
+    }
+  }
+
+  // Extract the entity token = the name with the qualifier-tail removed.
+  let entityToken: string | null = null;
+  if (matchedFamily && qualifierStart >= 0) {
+    const prefix = working.slice(0, qualifierStart).trim().replace(/[-_,:|]\s*$/, "").trim();
+    entityToken = prefix.length > 0 ? prefix : null;
+  } else {
+    entityToken = working.length > 0 ? working : null;
+  }
+
+  // Decide the compound pattern.
+  let compoundPattern: CompoundPattern;
+  if (matchedFamily && entityToken && embeddedId) {
+    compoundPattern = "entity_plus_qualifier_plus_id";
+  } else if (matchedFamily && entityToken) {
+    compoundPattern = "entity_plus_qualifier";
+  } else if (matchedFamily && !entityToken) {
+    compoundPattern = "qualifier_only";
+  } else if (!matchedFamily && entityToken && embeddedId) {
+    compoundPattern = "entity_plus_qualifier_plus_id"; // entity + id only, but slot it here so id-bearing names rolls up
+  } else if (!matchedFamily && embeddedId && !entityToken) {
+    compoundPattern = "id_only";
+  } else {
+    compoundPattern = "entity_only";
+  }
+
+  // If we tagged the pattern as "entity_plus_qualifier_plus_id" because
+  // we only had id (no qualifier), reset to entity_only with id.
+  if (!matchedFamily && embeddedId) {
+    compoundPattern = entityToken ? "entity_only" : "id_only";
+  }
+
+  return {
+    compoundPattern,
+    entityToken,
+    qualifierLabel: matchedLabel,
+    qualifierFamily: matchedFamily,
+    embeddedId,
+  };
 }
 
 // ---------------------------------------------------------------------------
