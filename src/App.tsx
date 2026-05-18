@@ -42,6 +42,7 @@ const AGGREGATE_HASHES = new Set([
   "complex-tail",
   "complex-by-bookings",
   "complex-by-industry",
+  "property-schematics",
   "complex-matrix",
   "complex-top-orgs",
   "aggregate-method",
@@ -3331,11 +3332,87 @@ const topBandByFamily: Record<string, BandConcentration | null> = (() => {
   return out;
 })();
 
+// GradientStat: a Stat-shaped cell tinted by a conditional-formatting
+// gradient. `intensity` is 0..1 (0 = palest, 1 = strongest). The hue
+// is fixed per stat-type (green for money, blue for org counts) so the
+// reader can scan a column of cards at a glance and see which archetype
+// commands the most bookings/orgs.
+const GradientStat = ({
+  value,
+  label,
+  intensity,
+  hue,
+}: {
+  value: string;
+  label: string;
+  intensity: number; // 0..1
+  hue: "green" | "blue";
+}): JSX.Element => {
+  const clamped = Math.max(0, Math.min(1, intensity));
+  // Map intensity to background alpha. Floor at 0.06 so even the
+  // smallest archetype gets a perceptible tint; max at 0.55 so the
+  // strongest still leaves text legible. Border alpha tracks the bg.
+  const bgAlpha = 0.06 + clamped * 0.49;
+  const borderAlpha = 0.25 + clamped * 0.55;
+  const rgb = hue === "green" ? "16, 185, 129" : "59, 130, 246";
+  // Foreground numeric color: same hue at high lightness so it pops
+  // against the tinted dark background.
+  const fg = hue === "green" ? "#6ee7b7" : "#93c5fd";
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        padding: 16,
+        background: `rgba(${rgb}, ${bgAlpha.toFixed(3)})`,
+        border: `1px solid rgba(${rgb}, ${borderAlpha.toFixed(3)})`,
+        borderRadius: 8,
+        gap: 4,
+        minHeight: 70,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          color: fg,
+          lineHeight: 1.1,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: "#94a3b8",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+};
+
 const ArchetypeFamilyCards = (): JSX.Element => {
   const shares = aggregateSnapshot.complexTail.archetypeShares as Record<
     string,
     { count: number; share: number; bookings: number; bookingsShare: number }
   >;
+  // Find max bookings and max orgs across the archetype families that
+  // appear in archetypePatterns, so every gradient is normalized to the
+  // same scale ("conditional formatting" in Google Sheets parlance).
+  let maxBookings = 0;
+  let maxOrgs = 0;
+  for (const a of archetypePatterns) {
+    const s = shares[a.family];
+    if (!s) continue;
+    if (s.bookings > maxBookings) maxBookings = s.bookings;
+    if (s.count > maxOrgs) maxOrgs = s.count;
+  }
   return (
     <Grid columns={2} gap={16}>
       {archetypePatterns.map((a) => {
@@ -3343,10 +3420,15 @@ const ArchetypeFamilyCards = (): JSX.Element => {
         const orgsInTail = s?.count ?? 0;
         const shareOfTailOrgs = s?.share ?? 0;
         const bookings = s?.bookings ?? 0;
-        const shareOfTailBookings = s?.bookingsShare ?? 0;
         const medianPerOrg = orgsInTail > 0 ? bookings / orgsInTail : 0;
         const topBand = topBandByFamily[a.family];
-        const tone = archetypeFamilyTone[a.family];
+        // Normalize each archetype's bookings and org count to the
+        // max across the 9 families. The `% of complex orgs` stat
+        // inherits the same blue hue and the same intensity as the
+        // org-count stat so the column visually reads as a single
+        // signal.
+        const bookingsIntensity = maxBookings > 0 ? bookings / maxBookings : 0;
+        const orgsIntensity = maxOrgs > 0 ? orgsInTail / maxOrgs : 0;
         return (
           <Card key={a.family}>
             <CardHeader trailing={<ArchetypePill family={a.family} />}>
@@ -3354,26 +3436,33 @@ const ArchetypeFamilyCards = (): JSX.Element => {
             </CardHeader>
             <CardBody>
               <Stack gap={14}>
-                {/* HEADLINE STATS: matches the visual cadence of the
-                    customer deep-dive panels. */}
-                <Grid columns={4} gap={10}>
-                  <Stat
-                    value={orgsInTail.toLocaleString()}
-                    label="Complex-tail orgs"
-                    tone={tone === "info" ? "info" : undefined}
-                  />
-                  <Stat
-                    value={`${(shareOfTailOrgs * 100).toFixed(1)}%`}
-                    label="of complex orgs"
-                  />
-                  <Stat
+                {/* HEADLINE STATS: ordered Lifetime bookings ->
+                    Complex-tail orgs -> % of complex orgs.
+                    %-of-complex-bookings has been dropped per
+                    feedback (redundant with the absolute dollar
+                    figure). Bookings + Orgs use conditional-formatting
+                    gradients normalized across all 9 archetypes;
+                    %-of-complex-orgs inherits the org-count intensity
+                    so the org signal reads as a single column at a
+                    glance. */}
+                <Grid columns={3} gap={10}>
+                  <GradientStat
                     value={fmtMoney(bookings)}
                     label="Lifetime bookings"
-                    tone="success"
+                    intensity={bookingsIntensity}
+                    hue="green"
                   />
-                  <Stat
-                    value={`${(shareOfTailBookings * 100).toFixed(1)}%`}
-                    label="of complex bookings"
+                  <GradientStat
+                    value={orgsInTail.toLocaleString()}
+                    label="Complex-tail orgs"
+                    intensity={orgsIntensity}
+                    hue="blue"
+                  />
+                  <GradientStat
+                    value={`${(shareOfTailOrgs * 100).toFixed(1)}%`}
+                    label="of complex orgs"
+                    intensity={orgsIntensity}
+                    hue="blue"
                   />
                 </Grid>
 
@@ -3656,12 +3745,12 @@ const ViewSwitcher = ({
               onClick={() => setView("overview")}
               title={
                 view === "overview"
-                  ? "Overview: currently selected"
-                  : "Switch to the cross-cutting overview"
+                  ? "Overview & Population: currently selected"
+                  : "Switch to the cross-cutting overview and population framing"
               }
               leadingContent={view === "overview" ? <ActiveDot /> : null}
             >
-              Overview
+              Overview & Population
             </Pill>
             <Pill
               size="md"
@@ -3670,12 +3759,12 @@ const ViewSwitcher = ({
               onClick={() => setView("detail")}
               title={
                 view === "detail"
-                  ? "Customer deep-dives: currently selected"
-                  : "Switch to per-customer deep-dives"
+                  ? "Customer Details: 12 Top Site Tree Complexity Orgs - currently selected"
+                  : "Switch to per-customer deep-dives for the 12 most complex orgs"
               }
               leadingContent={view === "detail" ? <ActiveDot /> : null}
             >
-              Customer deep-dives (12)
+              Customer Details: 12 Top Site Tree Complexity Orgs
             </Pill>
             <Pill
               size="md"
@@ -3684,12 +3773,12 @@ const ViewSwitcher = ({
               onClick={() => setView("aggregate")}
               title={
                 view === "aggregate"
-                  ? "Aggregate patterns: currently selected"
-                  : `Switch to the complex-tail analysis (top ${(aggregateSnapshot.totals.complexTailSize / 1000).toFixed(1)}K orgs holding ${(aggregateSnapshot.totals.complexTailBookingsShare * 100).toFixed(0)}% of bookings)`
+                  ? "Global Site Node Naming: currently selected"
+                  : `Switch to the population-wide naming analysis (all 31K orgs, focus on the ~${(aggregateSnapshot.totals.complexTailSize / 1000).toFixed(1)}K complex tail holding ${(aggregateSnapshot.totals.complexTailBookingsShare * 100).toFixed(0)}% of bookings)`
               }
               leadingContent={view === "aggregate" ? <ActiveDot /> : null}
             >
-              Aggregate patterns (complex tail)
+              Global Site Node Naming
             </Pill>
           </Row>
           <Row gap={10} align="center">
@@ -3791,14 +3880,29 @@ const TOC_ENTRIES: { id: string; label: string }[] = [
   { id: "method", label: "Method" },
 ];
 
-function TableOfContents(): JSX.Element {
+const AGGREGATE_TOC_ENTRIES: { id: string; label: string }[] = [
+  { id: "simple-base", label: "1. The simple base" },
+  { id: "complex-tail", label: "2. Complex tail at a glance" },
+  { id: "complex-by-bookings", label: "3. By bookings band" },
+  { id: "complex-by-industry", label: "4. Industry deep-dives" },
+  { id: "property-schematics", label: "5. Property schematics" },
+  { id: "complex-matrix", label: "6. By bookings band (detail)" },
+  { id: "complex-top-orgs", label: "7. Top high-value orgs" },
+  { id: "aggregate-method", label: "Method & caveats" },
+];
+
+function TableOfContents({
+  entries = TOC_ENTRIES,
+}: {
+  entries?: { id: string; label: string }[];
+} = {}): JSX.Element {
   return (
     <Stack gap={6}>
       <Text size="small" weight="semibold" tone="secondary">
         JUMP TO
       </Text>
       <Row gap={6} wrap>
-        {TOC_ENTRIES.map((e) => (
+        {entries.map((e) => (
           <button
             key={e.id}
             type="button"
@@ -4058,7 +4162,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
         <OverviewAggregateStats />
         <Row gap={10} align="center" wrap>
           <Button variant="primary" onClick={() => setView("aggregate")}>
-            Open Aggregate patterns →
+            Open Global Site Node Naming →
           </Button>
           <Text size="small" tone="secondary">
             Simple-base callout, complex-tail composition, breakdown by
@@ -4630,6 +4734,62 @@ const QUALIFIER_FAMILY_LABEL_CLIENT: Record<QualifierFamilyKey, string> = {
   zone: "zone / area / sector / bay",
 };
 
+// TopShape -> Pill tone. Keep the per-shape palette consistent across the
+// app: blue=geo, violet=entity, amber=code/lifecycle, green=function,
+// magenta=spatial, slate=corporate, orange=device. This mirrors
+// rootShapeColor (legacy 7-shape palette) so that a `geo` sub-code chip
+// in a subtree visually rhymes with a `geographic` ShapeChip elsewhere.
+const TOP_SHAPE_TO_TONE: Record<string, PillToneKey> = {
+  geo: "info",
+  entity: "renamed",
+  code: "warning",
+  corporate: "secondary",
+  function: "success",
+  spatial: "added",
+  lifecycle: "warning",
+  device: "deleted",
+};
+
+type PillToneKey =
+  | "info"
+  | "warning"
+  | "success"
+  | "danger"
+  | "neutral"
+  | "renamed"
+  | "added"
+  | "deleted"
+  | "secondary";
+
+// Spatial qualifier family -> TopShape, so the on-the-fly client-side
+// compound detector can pick a tone consistent with the population
+// rollups. Almost every qualifier family rolls up to the `spatial`
+// TopShape; building/floor/room/zone are formally `code`-like but in
+// the property-schematic context they read as spatial granularity, so
+// keep them spatial here as well.
+const QUALIFIER_FAMILY_TO_TOP_SHAPE: Record<QualifierFamilyKey, string> = {
+  inside_outside: "spatial",
+  direction_relative: "spatial",
+  direction_cardinal: "spatial",
+  entry_exit: "spatial",
+  dock: "spatial",
+  gate_yard: "spatial",
+  parking_garage: "spatial",
+  circulation: "spatial",
+  kitchen_break: "function",
+  office_admin: "function",
+  warehouse_floor: "function",
+  lab_research: "function",
+  building_letter: "code",
+  floor: "spatial",
+  room: "spatial",
+  it_data_room: "function",
+  zone: "spatial",
+};
+
+const toneForTopShape = (topShape: string | undefined): PillToneKey =>
+  (topShape && TOP_SHAPE_TO_TONE[topShape]) || "neutral";
+
 function detectQualifierClient(
   name: string,
 ): { family: QualifierFamilyKey; label: string } | null {
@@ -4670,29 +4830,70 @@ function ExampleSubtree({
         const indent = Math.max(0, n.depth - rootDepth - 1);
         const compound = detectQualifierClient(n.name);
         const subIsMeaningful = n.subCode && n.subCode !== "named";
+        // Prefer the backend-assigned topShape (from taxonomy.json) so
+        // the pill tone matches the rollup classification. Fall back to
+        // the qualifier-family mapping if only a compound qualifier
+        // was detected client-side. Worst case: neutral.
+        const subTone = toneForTopShape(n.topShape);
+        const compoundTopShape = compound
+          ? QUALIFIER_FAMILY_TO_TOP_SHAPE[compound.family]
+          : undefined;
+        const compoundTone = toneForTopShape(compoundTopShape);
+        const cam = n.cameras || 0;
+        const ac = n.acPanels || 0;
+        const alarmDev = n.alarmDevices || 0;
+        const alarmPan = n.alarmPanels || 0;
+        const deviceChips: { label: string; value: number }[] = [];
+        if (cam) deviceChips.push({ label: "cam", value: cam });
+        if (ac) deviceChips.push({ label: "AC", value: ac });
+        if (alarmDev) deviceChips.push({ label: "alarm-dev", value: alarmDev });
+        if (alarmPan) deviceChips.push({ label: "alarm-pan", value: alarmPan });
         return (
           <Row key={`${n.name}-${i}`} gap={6} align="center">
             <span style={{ display: "inline-block", width: indent * 14 }} />
             <Text size="small" tone="secondary">└</Text>
             <Text size="small">{n.name}</Text>
-            {subIsMeaningful ? (
-              <Pill
-                size="sm"
-                tone="neutral"
-                title={prettySubCode(n.subCode!)}
-              >
-                {prettySubCode(n.subCode!)}
-              </Pill>
-            ) : compound ? (
-              <Pill
-                size="sm"
-                tone="info"
-                title={`Compound qualifier: ${QUALIFIER_FAMILY_LABEL_CLIENT[compound.family]}`}
-              >
-                {compound.label}
-              </Pill>
-            ) : null}
-            <MixPill mix={exampleNodeMix(n)} />
+            <span
+              style={{
+                marginLeft: "auto",
+                display: "inline-flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              {deviceChips.length > 0 ? (
+                <Row gap={6} align="center" wrap>
+                  {deviceChips.map((c) => (
+                    <Text
+                      key={c.label}
+                      size="small"
+                      tone="secondary"
+                      style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                      {c.value} {c.label}
+                    </Text>
+                  ))}
+                </Row>
+              ) : null}
+              {subIsMeaningful ? (
+                <Pill
+                  size="sm"
+                  tone={subTone}
+                  title={`${prettySubCode(n.subCode!)} (top shape: ${n.topShape ?? "n/a"})`}
+                >
+                  {prettySubCode(n.subCode!)}
+                </Pill>
+              ) : compound ? (
+                <Pill
+                  size="sm"
+                  tone={compoundTone}
+                  title={`Compound qualifier: ${QUALIFIER_FAMILY_LABEL_CLIENT[compound.family]} (top shape: ${compoundTopShape ?? "spatial"})`}
+                >
+                  {compound.label}
+                </Pill>
+              ) : null}
+              <MixPill mix={exampleNodeMix(n)} />
+            </span>
           </Row>
         );
       })}
@@ -5363,7 +5564,7 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
   const t = aggregateSnapshot.totals;
   return (
     <Stack gap={24}>
-      <Callout tone="info" title="You're viewing aggregate patterns (complex tail)">
+      <Callout tone="info" title="Global Site Node Naming: All 31K Customers, Focus on 6K Complex Orgs">
         <Stack gap={10}>
           <Text size="small">
             Two stories from the {t.totalOrgs.toLocaleString()}-org base.
@@ -5404,6 +5605,8 @@ const AggregateSlide = ({ setView }: { setView: (v: View) => void }): JSX.Elemen
           </Row>
         </Stack>
       </Callout>
+
+      <TableOfContents entries={AGGREGATE_TOC_ENTRIES} />
 
       <Divider />
 
