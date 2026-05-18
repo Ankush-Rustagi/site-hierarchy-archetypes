@@ -14,6 +14,14 @@ The dashboard has four VIEWs in the top-of-page switcher:
   single-click CSV download contains all 143 hierarchy nodes across the 12
   customers (rank, name, path, depth, node type, product mix, device counts)
   for feeding into Cursor / Claude to generate Maps 2 navigation mockups.
+  Each detail page also includes a **Representative subtrees from Athena**
+  section: one card per root-shape the customer uses (geographic /
+  facility-code / function-word / corporate-tree / school-code / entity-name
+  / lifecycle-marker), with the actual full subtree from
+  `auth.directory_paths_latest` so the *sub-archetypes inside* a single
+  customer are visible (e.g. BC Legislative Assembly's three functional
+  roots; Charter Schools USA's flat school-code roots next to the corporate
+  Red Apple > Schools > Florida tree).
 - **Population analysis (~35K orgs)** — the same classifier run against the
   full active-paid customer base. Headline frequencies, root-shape coverage,
   archetype-family distribution (all orgs vs the complex subset side by side),

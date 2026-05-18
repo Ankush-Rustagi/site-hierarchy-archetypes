@@ -25,6 +25,7 @@ import type { JSX, ReactNode } from "react";
 import populationSnapshot from "./data/population.json";
 import industryMatrixSnapshot from "./data/industry-matrix.json";
 import comparisonCohortSnapshot from "./data/comparison-cohort.json";
+import customerSubtreesSnapshot from "./data/customer-subtrees.json";
 
 const OVERVIEW_HASHES = new Set([
   "customers-at-a-glance",
@@ -2190,6 +2191,103 @@ function SimilarCustomersRow({
   );
 }
 
+// Lookup of representative subtrees pulled from Athena for the 12 deep-dive
+// customers. Built from data/raw/customer_subtrees.csv via
+// `npm run build:subtrees`. Keyed on Customer.name (NAME_MAP in the script
+// reconciles SFDC names to the names used in this file).
+const customerSubtreesByName: Record<string, typeof customerSubtreesSnapshot["customers"][number]> = (() => {
+  const out: Record<string, typeof customerSubtreesSnapshot["customers"][number]> = {};
+  for (const c of customerSubtreesSnapshot.customers) {
+    out[c.sfdcAccountName] = c;
+  }
+  return out;
+})();
+
+const ROOT_SHAPE_TONE: Record<string, "info" | "warning" | "success" | "renamed" | "added" | "deleted" | "neutral"> = {
+  geographic: "info",
+  facility_code: "warning",
+  function_word: "success",
+  entity_name: "neutral",
+  corporate_tree: "renamed",
+  school_code: "added",
+  lifecycle_marker: "deleted",
+};
+
+function RepresentativeSubtrees({
+  customerName,
+  totalSites,
+}: {
+  customerName: string;
+  totalSites: number;
+}): JSX.Element | null {
+  const data = customerSubtreesByName[customerName];
+  if (!data || data.representativeSubtrees.length === 0) return null;
+
+  return (
+    <Stack gap={10}>
+      <H3>
+        Representative subtrees from Athena ({data.representativeSubtrees.length} sub-archetypes, {data.rootCount} total roots in extract)
+      </H3>
+      <Text size="small" tone="secondary">
+        Real site hierarchies pulled directly from <Code>auth.directory_paths_latest</Code> for this customer. Each subtree below is the
+        highest-scoring depth-1 root for one distinct root-shape pattern this
+        customer uses — picked by node-type variety, depth, and readable size
+        (≤ 60 nodes per subtree). When more than 60 sites sit under a root, the
+        long tail is collapsed into a single &quot;[+N more sites]&quot; placeholder.
+      </Text>
+
+      <Row gap={6} align="center" wrap>
+        <Text size="small" tone="secondary">Root-shape coverage in this account:</Text>
+        {data.rootShapeCoverage.map((r) => (
+          <Pill
+            key={`cov-${r.shape}`}
+            size="sm"
+            tone={ROOT_SHAPE_TONE[r.shape] ?? "neutral"}
+          >
+            {r.shapeLabel} · {r.rootCount}
+          </Pill>
+        ))}
+      </Row>
+
+      <Stack gap={14}>
+        {data.representativeSubtrees.map((rep, i) => (
+          <Card key={`rep-${i}-${rep.rootName}`}>
+            <CardHeader>
+              <Row gap={8} align="center" wrap>
+                <Pill size="sm" tone={ROOT_SHAPE_TONE[rep.rootShape] ?? "neutral"}>
+                  {rep.rootShapeLabel}
+                </Pill>
+                <Text size="small" weight="semibold">{rep.rootName}</Text>
+                <Text size="small" tone="secondary">
+                  · {rep.totalNodes} nodes · depth {rep.maxDepth} · {rep.distinctNodeTypes} node type{rep.distinctNodeTypes === 1 ? "" : "s"}
+                </Text>
+              </Row>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={8}>
+                <Text size="small" tone="secondary">{rep.rationale}</Text>
+                <Stack gap={2}>
+                  {rep.subtree.map((node, idx) => (
+                    <TreeRow
+                      key={`${rep.rootName}-${idx}`}
+                      node={node as unknown as TreeNode}
+                      depth={0}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+            </CardBody>
+          </Card>
+        ))}
+      </Stack>
+
+      <Text size="small" tone="secondary">
+        Each subtree above is one example of a sub-archetype this customer uses. The header pill is the inferred root shape; pill counts above the cards show how many depth-1 roots fall into each shape across all {totalSites} sites in the account.
+      </Text>
+    </Stack>
+  );
+}
+
 function CustomerDetail({
   c,
   onPickCustomer,
@@ -2320,6 +2418,8 @@ function CustomerDetail({
           name is its descendant count.
         </Text>
       </Stack>
+
+      <RepresentativeSubtrees customerName={c.name} totalSites={c.totalSites} />
 
       <Divider />
 

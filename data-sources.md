@@ -31,6 +31,7 @@ rebuild the snapshots. Row counts as of the 2026-05-18 pull:
 | `root_names.csv` | One row per (org, depth-1 site name) | 150,333 |
 | `org_axes.csv` | One row per `sfdc_account_id` | 31,408 |
 | `comparison_cohort.csv` | One row per org passing the original complexity gate (no size cap) | 156 |
+| `customer_subtrees.csv` | One row per (org, site) at every depth for the 12 deep-dive customers only | 1,708 |
 
 ## Filter applied at extraction time
 
@@ -61,10 +62,45 @@ npm run build:snapshots   (tsx scripts/build-snapshots.ts)
         src/data/industry-matrix.json
         src/data/comparison-cohort.json
         src/data/method-numbers.json
+
+npm run build:subtrees    (tsx scripts/build-customer-subtrees.ts)
+   │
+   ├─ index customer_subtrees.csv by parent_site_id
+   ├─ classify every depth-1 root by root shape (classifier.ts)
+   ├─ score each candidate root on (node-type variety, depth,
+   │    readable subtree size)
+   ├─ pick the top-scoring root per shape per customer
+   ├─ materialize the full subtree (cap 60 nodes; overflow tail
+   │    collapsed into a single "[+N more sites]" placeholder)
+   └─ emit:
+        src/data/customer-subtrees.json
    │
    ▼
 npm run build → Vite → GitHub Pages
 ```
+
+## Customer subtree picker
+
+`scripts/build-customer-subtrees.ts` consumes `customer_subtrees.csv` (the
+1,708-row full hierarchy dump for the 12 deep-dive customers, including
+depths 1–7) and emits one representative subtree per **root shape** present
+at each customer.
+
+The scoring rule per candidate root:
+
+- `+1000` per distinct node-type the subtree contains (mixed / structural /
+  leaf_with_devices / dead_end). Maxes out at 4.
+- `+200` per depth level inside the subtree.
+- `+500` if the subtree has 8–50 nodes (readable sweet spot).
+- `+200` if it has 4–80 nodes.
+- `-500` for 1–2 node subtrees (too trivial).
+- `-250` for subtrees over 100 nodes (too noisy).
+
+The picker emits up to 5 subtrees per customer. The React detail page renders
+each subtree as its own card with the inferred root shape, an auto-generated
+rationale, and the actual site names from Athena — so a customer with both a
+"geographic-first" tree and a "function-word" tree (e.g. BC Legislative
+Assembly) shows both side by side.
 
 ## Known limitations
 
