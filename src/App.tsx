@@ -4550,6 +4550,103 @@ const exampleNodeMix = (n: IndustryExampleChild): ProductMix => {
   return "access_or_alarms_only";
 };
 
+// Inline compound-pattern detector. Mirrors scripts/classifier.ts:
+// detectCompoundPattern so individual nodes in the example subtrees can
+// surface a qualifier-family pill even when the standalone classifier
+// fell back to "named entity (no detected pattern)".
+//
+// Keep in sync with scripts/classifier.ts QUALIFIER_TAILS table. If they
+// drift, the per-node pills in the example trees will disagree with the
+// population rollups in section 5 of the aggregate VIEW.
+type QualifierFamilyKey =
+  | "inside_outside"
+  | "direction_relative"
+  | "direction_cardinal"
+  | "entry_exit"
+  | "dock"
+  | "gate_yard"
+  | "parking_garage"
+  | "circulation"
+  | "kitchen_break"
+  | "office_admin"
+  | "warehouse_floor"
+  | "lab_research"
+  | "building_letter"
+  | "floor"
+  | "room"
+  | "it_data_room"
+  | "zone";
+
+const QUALIFIER_TAILS_CLIENT: Array<{
+  rx: RegExp;
+  family: QualifierFamilyKey;
+  label: string;
+}> = [
+  { rx: /\b(Interior|Indoor|Inside)\b\s*$/i, family: "inside_outside", label: "Interior" },
+  { rx: /\b(Exterior|Outdoor|Outside)\b\s*$/i, family: "inside_outside", label: "Exterior" },
+  { rx: /\b(Perimeter|Fence(?:line)?)\b\s*$/i, family: "inside_outside", label: "Perimeter" },
+  { rx: /\b(Roof(?:top)?)\b\s*$/i, family: "inside_outside", label: "Roof" },
+  { rx: /\b(Main\s+Entrance|Front\s+Entrance|Rear\s+Entrance|Side\s+Entrance|Entrance)\b\s*$/i, family: "entry_exit", label: "Entrance" },
+  { rx: /\b(Main\s+Lobby|Front\s+Lobby|Lobby)\b\s*$/i, family: "entry_exit", label: "Lobby" },
+  { rx: /\b(Reception|Vestibule|Foyer|Atrium)\b\s*$/i, family: "entry_exit", label: "Reception" },
+  { rx: /\b(Exit)\b\s*$/i, family: "entry_exit", label: "Exit" },
+  { rx: /\b(Loading\s+Dock|Loading)\b\s*$/i, family: "dock", label: "Loading" },
+  { rx: /\b(Shipping|Receiving|Dock(?:s)?)\b\s*$/i, family: "dock", label: "Dock" },
+  { rx: /\b(Gate(?:s|house)?)\b\s*$/i, family: "gate_yard", label: "Gate" },
+  { rx: /\b(Courtyard|Quad|Grounds|Yard|Field)\b\s*$/i, family: "gate_yard", label: "Yard" },
+  { rx: /\b(Parking\s+Lot|Parking\s+Garage|Parking|Garage|Carport)\b\s*$/i, family: "parking_garage", label: "Parking" },
+  { rx: /\bLot\b\s*$/i, family: "gate_yard", label: "Lot" },
+  { rx: /\b(Front|Back|Rear|Side)\b\s*$/i, family: "direction_relative", label: "Front/Back/Side" },
+  { rx: /\b(Northeast|Northwest|Southeast|Southwest|NE|NW|SE|SW)\b\s*$/i, family: "direction_cardinal", label: "Cardinal (NE/NW/SE/SW)" },
+  { rx: /\b(North|South|East|West)\b\s*$/i, family: "direction_cardinal", label: "Cardinal (N/S/E/W)" },
+  { rx: /\b(Hallway|Corridor|Stairwell|Stairway|Stairs|Elevator)\b\s*$/i, family: "circulation", label: "Hallway / Stairs" },
+  { rx: /\b(Cafeteria|Cafe|Kitchen|Dining|Break\s+Room)\b\s*$/i, family: "kitchen_break", label: "Kitchen" },
+  { rx: /\b(Office|Admin|HQ|Administration)\b\s*$/i, family: "office_admin", label: "Office" },
+  { rx: /\b(Warehouse|Production|Plant|Mill|Factory)\b\s*$/i, family: "warehouse_floor", label: "Warehouse" },
+  { rx: /\b(Lab(?:oratory)?)\b\s*$/i, family: "lab_research", label: "Lab" },
+  { rx: /\b(MDF|IDF|Server\s+Room|Data\s+Center|IT\s+Closet)\b\s*$/i, family: "it_data_room", label: "IT Closet" },
+  { rx: /\b(Building\s+[A-Z0-9]|Wing\s+[A-Z0-9]|Block\s+[A-Z0-9])\s*$/i, family: "building_letter", label: "Building/Wing" },
+  { rx: /\b\d{1,2}(st|nd|rd|th)?\s+Floor\b\s*$/i, family: "floor", label: "Floor" },
+  { rx: /\b(Zone\s+[A-Z0-9]|Area\s+[A-Z0-9]|Bay\s+\d)\s*$/i, family: "zone", label: "Zone" },
+];
+
+const QUALIFIER_FAMILY_LABEL_CLIENT: Record<QualifierFamilyKey, string> = {
+  inside_outside: "inside / outside",
+  direction_relative: "front / back / side / rear / main",
+  direction_cardinal: "cardinal (N / S / E / W)",
+  entry_exit: "entrance / exit / lobby / reception / vestibule",
+  dock: "loading dock / shipping / receiving",
+  gate_yard: "gate / yard / lot / courtyard / quad / grounds",
+  parking_garage: "parking lot / garage / carport",
+  circulation: "hallway / corridor / stairs / elevator",
+  kitchen_break: "kitchen / cafe / break room",
+  office_admin: "office / admin / HQ",
+  warehouse_floor: "warehouse / production / plant",
+  lab_research: "lab / research",
+  building_letter: "building letter / wing",
+  floor: "floor (ordinal or named)",
+  room: "room / suite",
+  it_data_room: "MDF / IDF / server room / IT closet",
+  zone: "zone / area / sector / bay",
+};
+
+function detectQualifierClient(
+  name: string,
+): { family: QualifierFamilyKey; label: string } | null {
+  // Strip a trailing embedded id so the qualifier can match the word
+  // just before it: "Mental Health Hub Exterior (102)" -> match
+  // "Exterior" not "(102)".
+  let working = (name || "").trim();
+  const parenId = working.match(/\s*\([A-Z0-9][A-Z0-9\-]{1,12}\)\s*$/);
+  if (parenId && typeof parenId.index === "number") {
+    working = working.slice(0, parenId.index).trim();
+  }
+  for (const q of QUALIFIER_TAILS_CLIENT) {
+    if (q.rx.test(working)) return { family: q.family, label: q.label };
+  }
+  return null;
+}
+
 // Renders the flat array of representative-root children (already in depth
 // order) as an indented tree. Adapter for the taxonomy.json example shape.
 function ExampleSubtree({
@@ -4571,13 +4668,29 @@ function ExampleSubtree({
       </Row>
       {children.map((n, i) => {
         const indent = Math.max(0, n.depth - rootDepth - 1);
+        const compound = detectQualifierClient(n.name);
+        const subIsMeaningful = n.subCode && n.subCode !== "named";
         return (
           <Row key={`${n.name}-${i}`} gap={6} align="center">
             <span style={{ display: "inline-block", width: indent * 14 }} />
             <Text size="small" tone="secondary">└</Text>
             <Text size="small">{n.name}</Text>
-            {n.subCode ? (
-              <Pill size="sm" tone="neutral">{prettySubCode(n.subCode)}</Pill>
+            {subIsMeaningful ? (
+              <Pill
+                size="sm"
+                tone="neutral"
+                title={prettySubCode(n.subCode!)}
+              >
+                {prettySubCode(n.subCode!)}
+              </Pill>
+            ) : compound ? (
+              <Pill
+                size="sm"
+                tone="info"
+                title={`Compound qualifier: ${QUALIFIER_FAMILY_LABEL_CLIENT[compound.family]}`}
+              >
+                {compound.label}
+              </Pill>
             ) : null}
             <MixPill mix={exampleNodeMix(n)} />
           </Row>
