@@ -22,16 +22,36 @@ import {
 } from "./canvas-shim";
 import { useEffect, useState } from "react";
 import type { JSX, ReactNode } from "react";
+import populationSnapshot from "./data/population.json";
+import industryMatrixSnapshot from "./data/industry-matrix.json";
+import comparisonCohortSnapshot from "./data/comparison-cohort.json";
 
 const OVERVIEW_HASHES = new Set([
   "customers-at-a-glance",
   "what-we-measured",
   "root-shapes",
   "archetype-families",
+  "population-frequencies",
+  "industry-patterns",
   "what-we-learned",
   "method",
 ]);
 const DETAIL_HASHES = new Set(["customer-deep-dives"]);
+const POPULATION_HASHES = new Set([
+  "population-headline",
+  "population-root-shapes",
+  "population-archetype-families",
+  "population-single-product",
+  "population-comparison",
+  "population-method",
+]);
+const INDUSTRY_HASHES = new Set([
+  "industry-headline",
+  "industry-rollup",
+  "industry-matrix",
+  "industry-similarity",
+  "industry-deep-dives",
+]);
 
 type ProductMix =
   | "cameras_only"
@@ -66,7 +86,10 @@ type ArchetypeFamily =
   | "single_campus"
   | "flat_fleet"
   | "deep_command"
-  | "hybrid_legacy";
+  | "hybrid_legacy"
+  | "camera_only_flat"
+  | "camera_only_geographic"
+  | "camera_only_deep";
 
 const archetypeFamilyLabels: Record<ArchetypeFamily, string> = {
   geographic_first: "Geographic-first",
@@ -76,6 +99,9 @@ const archetypeFamilyLabels: Record<ArchetypeFamily, string> = {
   flat_fleet: "Flat-fleet district",
   deep_command: "Deep command hierarchy",
   hybrid_legacy: "Hybrid legacy + corporate",
+  camera_only_flat: "Camera-only flat",
+  camera_only_geographic: "Camera-only geographic",
+  camera_only_deep: "Camera-only deep",
 };
 
 const archetypeFamilyTone: Record<ArchetypeFamily, "info" | "warning" | "success" | "renamed" | "added" | "deleted" | "neutral"> = {
@@ -86,6 +112,9 @@ const archetypeFamilyTone: Record<ArchetypeFamily, "info" | "warning" | "success
   flat_fleet: "added",
   deep_command: "deleted",
   hybrid_legacy: "neutral",
+  camera_only_flat: "neutral",
+  camera_only_geographic: "info",
+  camera_only_deep: "deleted",
 };
 
 type Customer = {
@@ -2531,15 +2560,26 @@ const ArchetypeFrequencyStats = (): JSX.Element => {
 };
 
 const PopulationCaveat = (): JSX.Element => {
+  const popTotal = populationSnapshot.methodNumbers.totalActivePaid;
+  const popRate = populationSnapshot.population.multiArchetypeRate;
+  const complexRate = populationSnapshot.complexSubset.multiArchetypeRate;
+  const complexTotal = populationSnapshot.complexSubset.total;
   return (
-    <Callout tone="warning" title="Population caveat">
+    <Callout tone="info" title="Population caveat (now resolved)">
       These twelve customers were pre-filtered for complexity (25–400 sites,
       max_depth ≥ 3, ≥ 3 product lines, ≥ 3 distinct product mixes). Uniform orgs
-      were excluded by design, so the 5 / 12 (42%) multi-archetype rate is an{" "}
-      <Text as="span" weight="semibold">upper bound</Text> for the paid customer
-      population. A true population frequency would need the same classifier run
-      against all paid orgs (~5–10K with ≥ 3 sites), a 15–25 min Athena scan not
-      done here.
+      were excluded by design, so the 5 / 12 (42%) multi-archetype rate was an
+      upper bound for the paid customer population.{" "}
+      <Text as="span" weight="semibold">
+        The full population analysis is now done.
+      </Text>{" "}
+      Across all {popTotal.toLocaleString()} active paid orgs the multi-archetype
+      rate is{" "}
+      <Text as="span" weight="semibold">{(popRate * 100).toFixed(1)}%</Text>;
+      within the {complexTotal.toLocaleString()}-org complex subset (same gate as
+      the original 12) it is{" "}
+      <Text as="span" weight="semibold">{(complexRate * 100).toFixed(0)}%</Text>.
+      See the Population and Industry VIEWs above.
     </Callout>
   );
 };
@@ -3058,7 +3098,7 @@ const ArchetypeFamilyCards = (): JSX.Element => {
   );
 };
 
-type View = "overview" | "detail";
+type View = "overview" | "detail" | "population" | "industry";
 
 const SharedHeader = (): JSX.Element => {
   const totalSites = customers.reduce((a, c) => a + c.totalSites, 0);
@@ -3264,6 +3304,34 @@ const ViewSwitcher = ({
             >
               Customer deep-dives (12)
             </Pill>
+            <Pill
+              size="md"
+              tone="info"
+              active={view === "population"}
+              onClick={() => setView("population")}
+              title={
+                view === "population"
+                  ? "Population analysis: currently selected"
+                  : `Switch to the population analysis (${populationSnapshot.methodNumbers.totalActivePaid.toLocaleString()} active paid orgs)`
+              }
+              leadingContent={view === "population" ? <ActiveDot /> : null}
+            >
+              Population analysis ({(populationSnapshot.methodNumbers.totalActivePaid / 1000).toFixed(0)}K orgs)
+            </Pill>
+            <Pill
+              size="md"
+              tone="info"
+              active={view === "industry"}
+              onClick={() => setView("industry")}
+              title={
+                view === "industry"
+                  ? "Industry analysis: currently selected"
+                  : "Switch to industry × size × bookings × device matrix"
+              }
+              leadingContent={view === "industry" ? <ActiveDot /> : null}
+            >
+              Industry analysis
+            </Pill>
           </Row>
           <Row gap={10} align="center">
             <Text size="small" tone="secondary">
@@ -3341,7 +3409,9 @@ const TOC_ENTRIES: { id: string; label: string }[] = [
   { id: "what-we-measured", label: "2. What we measured" },
   { id: "root-shapes", label: "3. Root shapes" },
   { id: "archetype-families", label: "4. Archetype families" },
-  { id: "what-we-learned", label: "5. What we learned" },
+  { id: "population-frequencies", label: "5. Population-level frequencies" },
+  { id: "industry-patterns", label: "6. Industry patterns" },
+  { id: "what-we-learned", label: "7. What we learned" },
   { id: "method", label: "Method" },
 ];
 
@@ -3508,7 +3578,50 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
       <Divider />
 
       <Stack gap={10}>
-        <H2 id="what-we-learned">5. What we learned</H2>
+        <H2 id="population-frequencies">5. Population-level frequencies</H2>
+        <Text tone="secondary" size="small">
+          The same classifier run against all{" "}
+          {populationSnapshot.methodNumbers.totalActivePaid.toLocaleString()}{" "}
+          active paid orgs. Closes the population caveat above.
+        </Text>
+        <PopulationHeadlineStats />
+        <Row gap={10} align="center" wrap>
+          <Button variant="primary" onClick={() => setView("population")}>
+            Open Population analysis →
+          </Button>
+          <Text size="small" tone="secondary">
+            Headline frequencies, root-shape coverage, archetype distribution,
+            single-product cohort, and the comparison cohort the original 12
+            missed.
+          </Text>
+        </Row>
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-patterns">6. Industry patterns</H2>
+        <Text tone="secondary" size="small">
+          Does industry predict archetype? Within Healthcare, do 200-camera orgs
+          converge on the same pattern? Does Manufacturing at 100 sites look like
+          K-12 at 100 sites?
+        </Text>
+        <IndustryHeadlineStats />
+        <Row gap={10} align="center" wrap>
+          <Button variant="primary" onClick={() => setView("industry")}>
+            Open Industry analysis →
+          </Button>
+          <Text size="small" tone="secondary">
+            Industry × size × bookings × device matrix, intra-industry entropy,
+            and cross-industry cosine similarity.
+          </Text>
+        </Row>
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="what-we-learned">7. What we learned</H2>
         <Text tone="secondary" size="small">
           Eight patterns that repeat across the twelve customers. Each one is
           a concrete example with the product implication.
@@ -3603,6 +3716,776 @@ const DetailSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element =
   );
 };
 
+// ---------------------------------------------------------------------------
+// Population analysis VIEW
+// ---------------------------------------------------------------------------
+
+type PopulationSnapshot = typeof populationSnapshot;
+type IndustryMatrixSnapshot = typeof industryMatrixSnapshot;
+type ComparisonCohortSnapshot = typeof comparisonCohortSnapshot;
+
+const ARCHETYPE_ORDER: ArchetypeFamily[] = [
+  "geographic_first",
+  "facility_code",
+  "function_first",
+  "single_campus",
+  "flat_fleet",
+  "deep_command",
+  "hybrid_legacy",
+  "camera_only_flat",
+  "camera_only_geographic",
+  "camera_only_deep",
+];
+
+const ROOT_SHAPE_ORDER = [
+  "geographic",
+  "facility_code",
+  "function_word",
+  "entity_name",
+  "corporate_tree",
+  "school_code",
+  "lifecycle_marker",
+] as const;
+
+function fmtPct(v: number, digits = 1): string {
+  return `${(v * 100).toFixed(digits)}%`;
+}
+
+const PopulationHeadlineStats = (): JSX.Element => {
+  const m = populationSnapshot.methodNumbers;
+  const pop = populationSnapshot.population;
+  const complex = populationSnapshot.complexSubset;
+  return (
+    <Grid columns={4} gap={12}>
+      <Stat
+        value={m.totalActivePaid.toLocaleString()}
+        label="Active paid orgs analyzed"
+        tone="info"
+      />
+      <Stat
+        value={fmtPct(pop.multiArchetypeRate, 1)}
+        label="Multi-archetype (population)"
+        tone="warning"
+      />
+      <Stat
+        value={`${complex.total} / ${fmtPct(complex.multiArchetypeRate, 0)}`}
+        label="Complex subset (orgs / multi-rate)"
+        tone="success"
+      />
+      <Stat
+        value={m.cameraOnly.toLocaleString()}
+        label="Camera-only orgs included"
+        tone="neutral"
+      />
+    </Grid>
+  );
+};
+
+const IndustryHeadlineStats = (): JSX.Element => {
+  const rollup = industryMatrixSnapshot.industryRollup;
+  const top = rollup[0];
+  const mostUniform = rollup
+    .filter((r) => r.orgCount >= 100)
+    .slice()
+    .sort((a, b) => b.modalShare - a.modalShare)[0];
+  const mostFragmented = rollup
+    .filter((r) => r.orgCount >= 100)
+    .slice()
+    .sort((a, b) => b.entropy - a.entropy)[0];
+  return (
+    <Grid columns={4} gap={12}>
+      <Stat
+        value={rollup.length.toString()}
+        label="Industry buckets covered"
+        tone="info"
+      />
+      <Stat
+        value={`${top.industry} (${top.orgCount.toLocaleString()})`}
+        label="Largest by org count"
+        tone="neutral"
+      />
+      <Stat
+        value={`${mostUniform?.industry ?? "—"} (${fmtPct(mostUniform?.modalShare ?? 0, 0)})`}
+        label="Most uniform (modal-share, N≥100)"
+        tone="success"
+      />
+      <Stat
+        value={`${mostFragmented?.industry ?? "—"} (H=${(mostFragmented?.entropy ?? 0).toFixed(2)})`}
+        label="Most fragmented (entropy)"
+        tone="warning"
+      />
+    </Grid>
+  );
+};
+
+function PopColHead({ label, tooltip }: { label: string; tooltip?: string }): JSX.Element {
+  if (!tooltip) return <Text size="small" weight="semibold">{label}</Text>;
+  return (
+    <Row gap={4} align="center">
+      <Text size="small" weight="semibold">{label}</Text>
+      <InfoIcon tooltip={tooltip} ariaLabel={`${label}: ${tooltip}`} />
+    </Row>
+  );
+}
+
+const PopulationRootShapeTable = ({
+  rows,
+  total,
+}: {
+  rows: PopulationSnapshot["population"]["rootShapeCoverage"];
+  total: number;
+}): JSX.Element => {
+  return (
+    <Table
+      headers={[
+        <PopColHead key="shape" label="Root shape" />,
+        <PopColHead key="orgs" label="Orgs" />,
+        <PopColHead key="share" label="Share of population" />,
+        <PopColHead key="bar" label="" />,
+      ]}
+      columnAlign={["left", "right", "right", "left"]}
+      colMinWidth={[160, 80, 110, 220]}
+      rows={rows.map((r) => [
+        <ShapeChip key={`s-${r.shape}`} shape={r.shape as RootShape} />,
+        <Text key={`o-${r.shape}`} size="small">
+          {r.orgs.toLocaleString()}
+        </Text>,
+        <Text key={`p-${r.shape}`} size="small">
+          {fmtPct(r.share, 1)}
+        </Text>,
+        <div
+          key={`b-${r.shape}`}
+          style={{
+            background: "rgba(96, 165, 250, 0.2)",
+            border: "1px solid rgba(96, 165, 250, 0.45)",
+            borderRadius: 4,
+            height: 12,
+            width: `${Math.max(2, r.share * 100)}%`,
+            minWidth: 4,
+          }}
+          title={`${r.orgs.toLocaleString()} of ${total.toLocaleString()} orgs`}
+        />,
+      ])}
+    />
+  );
+};
+
+const ArchetypeFrequencyTable = ({
+  shares,
+  total,
+  label,
+}: {
+  shares: PopulationSnapshot["population"]["archetypeShares"];
+  total: number;
+  label: string;
+}): JSX.Element => {
+  const rows = ARCHETYPE_ORDER.map((f) => ({
+    family: f,
+    count: shares[f]?.count ?? 0,
+    share: shares[f]?.share ?? 0,
+  })).sort((a, b) => b.count - a.count);
+  return (
+    <Table
+      headers={[
+        <PopColHead key="family" label="Archetype family" />,
+        <PopColHead key="count" label="Orgs" />,
+        <PopColHead key="share" label={`Share of ${label}`} />,
+        <PopColHead key="bar" label="" />,
+      ]}
+      columnAlign={["left", "right", "right", "left"]}
+      colMinWidth={[200, 80, 120, 220]}
+      rows={rows.map((r) => [
+        <Pill key={`p-${r.family}`} size="sm" tone={archetypeFamilyTone[r.family]}>
+          {archetypeFamilyLabels[r.family]}
+        </Pill>,
+        <Text key={`c-${r.family}`} size="small">
+          {r.count.toLocaleString()}
+        </Text>,
+        <Text key={`s-${r.family}`} size="small">
+          {fmtPct(r.share, 1)}
+        </Text>,
+        <div
+          key={`b-${r.family}`}
+          style={{
+            background: "rgba(168, 85, 247, 0.2)",
+            border: "1px solid rgba(168, 85, 247, 0.45)",
+            borderRadius: 4,
+            height: 12,
+            width: `${Math.max(2, r.share * 100)}%`,
+            minWidth: 4,
+          }}
+          title={`${r.count.toLocaleString()} of ${total.toLocaleString()} orgs`}
+        />,
+      ])}
+    />
+  );
+};
+
+const SingleProductCohortBlock = (): JSX.Element => {
+  const cb = populationSnapshot.cohortBreakdowns;
+  const m = populationSnapshot.methodNumbers;
+  const entries: { id: keyof typeof cb; label: string; tone: "info" | "success" | "warning" | "neutral"; count: number }[] = [
+    { id: "cameras_only", label: "Cameras only", tone: "info", count: m.cameraOnly },
+    { id: "access_only", label: "Access only", tone: "success", count: m.accessOnly },
+    { id: "alarms_only", label: "Alarms only", tone: "warning", count: m.alarmsOnly },
+    { id: "multi_product", label: "Multi-product", tone: "neutral", count: m.multiProduct },
+  ];
+  return (
+    <Stack gap={12}>
+      <Grid columns={4} gap={12}>
+        {entries.map((e) => (
+          <Stat
+            key={e.id}
+            value={e.count.toLocaleString()}
+            label={e.label}
+            tone={e.tone}
+          />
+        ))}
+      </Grid>
+      <Text size="small" tone="secondary">
+        Archetype split inside each cohort (top 3 families per cohort):
+      </Text>
+      <Grid columns={2} gap={12}>
+        {entries.map((e) => {
+          const shares = cb[e.id].shares as PopulationSnapshot["population"]["archetypeShares"];
+          const top3 = ARCHETYPE_ORDER.map((f) => ({
+            family: f,
+            count: shares[f]?.count ?? 0,
+            share: shares[f]?.share ?? 0,
+          }))
+            .filter((r) => r.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3);
+          return (
+            <Card key={`cohort-${e.id}`}>
+              <CardHeader>{e.label} ({e.count.toLocaleString()} orgs)</CardHeader>
+              <CardBody>
+                <Stack gap={6}>
+                  {top3.length === 0 ? (
+                    <Text size="small" tone="secondary">No orgs in this cohort.</Text>
+                  ) : (
+                    top3.map((r) => (
+                      <Row key={`${e.id}-${r.family}`} gap={8} align="center" justify="space-between">
+                        <Pill size="sm" tone={archetypeFamilyTone[r.family]}>
+                          {archetypeFamilyLabels[r.family]}
+                        </Pill>
+                        <Text size="small" tone="secondary">
+                          {r.count.toLocaleString()} ({fmtPct(r.share, 1)})
+                        </Text>
+                      </Row>
+                    ))
+                  )}
+                </Stack>
+              </CardBody>
+            </Card>
+          );
+        })}
+      </Grid>
+    </Stack>
+  );
+};
+
+const ComparisonCohortTable = (): JSX.Element => {
+  const cohort: ComparisonCohortSnapshot["cohort"] = comparisonCohortSnapshot.cohort;
+  const enterpriseMissed = cohort.filter((c) => !c.inOriginalTop12 && c.totalSites > 400);
+  const otherMissed = cohort.filter((c) => !c.inOriginalTop12 && c.totalSites <= 400);
+  const summary = `${comparisonCohortSnapshot.total} orgs pass the complexity gate (max_depth ≥ 3, product_lines ≥ 3, mixes ≥ 3, plus at least 2 of structural/mixed/dead-end thresholds). ${comparisonCohortSnapshot.originalTop12} are in the original 12 (sites 25–400). ${enterpriseMissed.length} are 400+ site enterprise orgs the size cap excluded.`;
+  const sortedShow = [...enterpriseMissed.slice(0, 20), ...otherMissed.slice(0, 5)];
+  return (
+    <Stack gap={10}>
+      <Text size="small">{summary}</Text>
+      <Table
+        headers={[
+          <PopColHead key="name" label="Account" />,
+          <PopColHead key="ind" label="Industry" />,
+          <PopColHead key="seg" label="Segment" />,
+          <PopColHead key="sites" label="Sites" />,
+          <PopColHead key="depth" label="Max depth" />,
+          <PopColHead key="mixes" label="Product mixes" />,
+          <PopColHead key="book" label="Lifetime $" />,
+          <PopColHead key="missed" label="Missed by 12" />,
+        ]}
+        columnAlign={["left", "left", "left", "right", "right", "right", "right", "left"]}
+        colMinWidth={[220, 220, 110, 70, 80, 90, 110, 110]}
+        rows={sortedShow.map((c) => [
+          <Text key={`n-${c.sfdcAccountName}`} size="small" weight="semibold">{c.sfdcAccountName}</Text>,
+          <Text key={`i-${c.sfdcAccountName}`} size="small" tone="secondary">{c.industry || "—"}</Text>,
+          <Text key={`s-${c.sfdcAccountName}`} size="small" tone="secondary">{c.accountSegment || "—"}</Text>,
+          <Text key={`ss-${c.sfdcAccountName}`} size="small">{c.totalSites.toLocaleString()}</Text>,
+          <Text key={`d-${c.sfdcAccountName}`} size="small">{c.maxDepth}</Text>,
+          <Text key={`m-${c.sfdcAccountName}`} size="small">{c.distinctProductMixes}</Text>,
+          <Text key={`b-${c.sfdcAccountName}`} size="small">${Math.round(c.lifetimeBookings / 1000).toLocaleString()}K</Text>,
+          c.inOriginalTop12 ? (
+            <Pill key={`t-${c.sfdcAccountName}`} size="sm" tone="success">In original 12</Pill>
+          ) : c.totalSites > 400 ? (
+            <Pill key={`t-${c.sfdcAccountName}`} size="sm" tone="warning">400+ size cap missed</Pill>
+          ) : (
+            <Pill key={`t-${c.sfdcAccountName}`} size="sm" tone="info">Not selected</Pill>
+          ),
+        ])}
+      />
+      <Text size="small" tone="secondary">
+        Showing the top {sortedShow.length} of {comparisonCohortSnapshot.total} qualifying orgs. The full list is in <Code>src/data/comparison-cohort.json</Code>.
+      </Text>
+    </Stack>
+  );
+};
+
+const PopulationSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element => {
+  const m = populationSnapshot.methodNumbers;
+  return (
+    <Stack gap={24}>
+      <Callout tone="info" title="You're viewing the population analysis">
+        <Stack gap={10}>
+          <Text size="small">
+            Same classifier as the 12-customer study, run against all{" "}
+            <Text as="span" weight="semibold">
+              {m.totalActivePaid.toLocaleString()} active paid orgs
+            </Text>{" "}
+            ({m.cameraOnly.toLocaleString()} of which are pure camera-only).
+            Data pulled via the Hex MCP, classified locally in TypeScript,
+            snapshotted to JSON, and shipped statically in the React bundle.
+          </Text>
+          <Row gap={8} align="center">
+            <Button variant="secondary" onClick={() => setView("overview")}>
+              ← Back to overview
+            </Button>
+            <Button variant="secondary" onClick={() => setView("industry")}>
+              Industry analysis →
+            </Button>
+          </Row>
+        </Stack>
+      </Callout>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-headline">1. Headline frequencies</H2>
+        <Text size="small" tone="secondary">
+          The number that the original 12-customer study could only upper-bound.
+        </Text>
+        <PopulationHeadlineStats />
+        <Callout tone="success" title="The 42% upper bound is now confirmed and contextualized">
+          <Stack gap={6}>
+            <Text size="small">
+              Across the full {m.totalActivePaid.toLocaleString()} active paid
+              orgs the multi-archetype rate is{" "}
+              <Text as="span" weight="semibold">
+                {fmtPct(populationSnapshot.population.multiArchetypeRate, 1)}
+              </Text>
+              . Inside the {populationSnapshot.complexSubset.total}-org complex
+              subset (max_depth ≥ 3, product_lines ≥ 3, mixes ≥ 3 — same gate as
+              the original 12) it climbs to{" "}
+              <Text as="span" weight="semibold">
+                {fmtPct(populationSnapshot.complexSubset.multiArchetypeRate, 0)}
+              </Text>
+              , above the 42% point estimate. So the original 42% under-counted
+              for complex orgs and dramatically over-counted for the population
+              as a whole — driven by the {m.cameraOnly.toLocaleString()}{" "}
+              camera-only orgs that mechanically cannot be multi-archetype.
+            </Text>
+            <Text size="small" tone="secondary">
+              Lifecycle-marker rate (population):{" "}
+              {fmtPct(populationSnapshot.population.lifecycleMarkerRate, 1)}.
+              Lifecycle-marker rate (complex subset):{" "}
+              {fmtPct(populationSnapshot.complexSubset.lifecycleMarkerRate, 1)}.
+            </Text>
+          </Stack>
+        </Callout>
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-root-shapes">2. Root-shape coverage</H2>
+        <Text size="small" tone="secondary">
+          What share of orgs have at least one depth-1 site name matching each
+          shape. Population-scale version of the 12-customer root-shape table.
+        </Text>
+        <PopulationRootShapeTable
+          rows={populationSnapshot.population.rootShapeCoverage}
+          total={populationSnapshot.population.total}
+        />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-archetype-families">3. Archetype-family frequency</H2>
+        <Text size="small" tone="secondary">
+          Population vs complex subset, side by side.
+        </Text>
+        <Grid columns={2} gap={12}>
+          <Card>
+            <CardHeader>
+              All active paid orgs ({populationSnapshot.population.total.toLocaleString()})
+            </CardHeader>
+            <CardBody>
+              <ArchetypeFrequencyTable
+                shares={populationSnapshot.population.archetypeShares}
+                total={populationSnapshot.population.total}
+                label="population"
+              />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>
+              Complex subset ({populationSnapshot.complexSubset.total.toLocaleString()})
+            </CardHeader>
+            <CardBody>
+              <ArchetypeFrequencyTable
+                shares={populationSnapshot.complexSubset.archetypeShares}
+                total={populationSnapshot.complexSubset.total}
+                label="complex"
+              />
+            </CardBody>
+          </Card>
+        </Grid>
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-single-product">4. Single-product cohort</H2>
+        <Text size="small" tone="secondary">
+          Camera-only, access-only, alarms-only, and multi-product splits, plus
+          which archetype families dominate inside each cohort.
+        </Text>
+        <SingleProductCohortBlock />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-comparison">5. Comparison cohort — enterprise orgs the original 12 missed</H2>
+        <Text size="small" tone="secondary">
+          Same complexity gate as the original shortlist, with the 25–400 size
+          cap removed.
+        </Text>
+        <ComparisonCohortTable />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="population-method">Method &amp; population at each gate</H2>
+        <Grid columns={4} gap={12}>
+          <Stat value={m.totalActivePaid.toLocaleString()} label="Active paid orgs" />
+          <Stat value={m.sitesGteThree.toLocaleString()} label="≥ 3 sites" />
+          <Stat value={m.maxDepthGteThree.toLocaleString()} label="max_depth ≥ 3" />
+          <Stat value={m.complexGate.toLocaleString()} label="Full complexity gate" />
+        </Grid>
+        <Text size="small">
+          Hex MCP ran the four Athena extracts against{" "}
+          <Code>auth.directory_paths_latest</Code> and{" "}
+          <Code>dim_account_hierarchy</Code>. Data pulled on{" "}
+          <Code>{m.pulledAt}</Code>. Site → device mapping reuses the production
+          cross-sell rule (second-to-last path segment → hyphenated UUID →{" "}
+          <Code>entity_type = 'site'</Code> confirmation). Classifier ported
+          byte-for-byte from <Code>src/App.tsx</Code> to{" "}
+          <Code>scripts/classifier.ts</Code> so the population frequencies stay
+          comparable with the original 12 numbers.
+        </Text>
+      </Stack>
+
+      <Divider />
+
+      <Callout tone="info" title="Want the industry view?">
+        <Row gap={8} align="center">
+          <Button variant="primary" onClick={() => setView("industry")}>
+            Open Industry analysis →
+          </Button>
+          <Text size="small" tone="secondary">
+            Industry × size × bookings × device matrix, intra/cross-industry
+            similarity, and per-industry deep-dive cards.
+          </Text>
+        </Row>
+      </Callout>
+    </Stack>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Industry analysis VIEW
+// ---------------------------------------------------------------------------
+
+const IndustryRollupTable = (): JSX.Element => {
+  const rollup = industryMatrixSnapshot.industryRollup;
+  return (
+    <Table
+      headers={[
+        <PopColHead key="ind" label="Industry" />,
+        <PopColHead key="orgs" label="Orgs" />,
+        <PopColHead key="modal" label="Modal archetype" />,
+        <PopColHead key="modalShare" label="Modal share" tooltip="Share of orgs in the industry that fall into the modal archetype." />,
+        <PopColHead key="entropy" label="Entropy" tooltip="Shannon entropy of the archetype distribution. Higher = more fragmented; lower = more uniform." />,
+        <PopColHead key="multi" label="Multi-arch rate" />,
+        <PopColHead key="medSites" label="Median sites" />,
+        <PopColHead key="medCams" label="Median cameras" />,
+        <PopColHead key="medBook" label="Median $" />,
+      ]}
+      columnAlign={["left", "right", "left", "right", "right", "right", "right", "right", "right"]}
+      colMinWidth={[180, 70, 180, 90, 80, 100, 90, 90, 100]}
+      rows={rollup.map((r) => [
+        <Text key={`n-${r.industry}`} size="small" weight="semibold">{r.industry}</Text>,
+        <Text key={`o-${r.industry}`} size="small">{r.orgCount.toLocaleString()}</Text>,
+        <Pill key={`p-${r.industry}`} size="sm" tone={archetypeFamilyTone[r.modalArchetype as ArchetypeFamily]}>
+          {archetypeFamilyLabels[r.modalArchetype as ArchetypeFamily]}
+        </Pill>,
+        <Text key={`ms-${r.industry}`} size="small">{fmtPct(r.modalShare, 0)}</Text>,
+        <Text key={`e-${r.industry}`} size="small">{r.entropy.toFixed(2)}</Text>,
+        <Text key={`m-${r.industry}`} size="small">{fmtPct(r.multiArchetypeRate, 0)}</Text>,
+        <Text key={`s-${r.industry}`} size="small">{r.medianSites.toLocaleString()}</Text>,
+        <Text key={`c-${r.industry}`} size="small">{r.medianCameras.toLocaleString()}</Text>,
+        <Text key={`b-${r.industry}`} size="small">${Math.round(r.medianBookings / 1000).toLocaleString()}K</Text>,
+      ])}
+    />
+  );
+};
+
+const IndustryMatrixTable = (): JSX.Element => {
+  // Show top 40 cells by org count to keep the matrix scannable.
+  const cells = industryMatrixSnapshot.matrix.filter((c) => c.orgCount >= 30).slice(0, 50);
+  return (
+    <Stack gap={6}>
+      <Text size="small" tone="secondary">
+        Cells with under 30 orgs are hidden for sample-size reasons. Showing the
+        top {cells.length} cells by org count.
+      </Text>
+      <Table
+        headers={[
+          <PopColHead key="ind" label="Industry" />,
+          <PopColHead key="size" label="Size band" />,
+          <PopColHead key="book" label="Bookings band" />,
+          <PopColHead key="dev" label="Device band" />,
+          <PopColHead key="orgs" label="Orgs" />,
+          <PopColHead key="modal" label="Modal archetype" />,
+          <PopColHead key="multi" label="Multi-arch rate" />,
+          <PopColHead key="medDepth" label="Median depth" />,
+          <PopColHead key="medMix" label="Median mixes" />,
+        ]}
+        columnAlign={["left", "left", "left", "left", "right", "left", "right", "right", "right"]}
+        colMinWidth={[170, 90, 100, 90, 60, 180, 100, 100, 100]}
+        rows={cells.map((c, i) => {
+          const modal = (Object.entries(c.archetypeShares) as [ArchetypeFamily, number][])
+            .sort((a, b) => b[1] - a[1])[0];
+          return [
+            <Text key={`i-${i}`} size="small">{c.industry}</Text>,
+            <Text key={`s-${i}`} size="small">{c.sizeBand}</Text>,
+            <Text key={`b-${i}`} size="small">{c.bookingsBand}</Text>,
+            <Text key={`d-${i}`} size="small">{c.deviceBand}</Text>,
+            <Text key={`o-${i}`} size="small">{c.orgCount.toLocaleString()}</Text>,
+            <Pill key={`p-${i}`} size="sm" tone={archetypeFamilyTone[modal[0]]}>
+              {archetypeFamilyLabels[modal[0]]} ({fmtPct(modal[1], 0)})
+            </Pill>,
+            <Text key={`m-${i}`} size="small">{fmtPct(c.multiArchetypeRate, 0)}</Text>,
+            <Text key={`md-${i}`} size="small">{c.medianMaxDepth.toString()}</Text>,
+            <Text key={`mm-${i}`} size="small">{c.medianProductMixes.toString()}</Text>,
+          ];
+        })}
+      />
+    </Stack>
+  );
+};
+
+const IndustrySimilarityCards = (): JSX.Element => {
+  const sim = industryMatrixSnapshot.crossIndustrySimilarity;
+  return (
+    <Stack gap={12}>
+      <Text size="small" tone="secondary">
+        Cosine similarity of archetype-share vectors between every pair of
+        industries with ≥ 50 orgs each. 1.0 = identical archetype mix, 0 = no
+        overlap. Top 12 most-similar pairs:
+      </Text>
+      <Grid columns={2} gap={10}>
+        {sim.slice(0, 12).map((p, i) => (
+          <Card key={`sim-${i}`}>
+            <CardBody>
+              <Stack gap={6}>
+                <Row gap={8} align="center" justify="space-between">
+                  <Row gap={6} align="center">
+                    <Text size="small" weight="semibold">{p.a}</Text>
+                    <Text size="small" tone="secondary">↔</Text>
+                    <Text size="small" weight="semibold">{p.b}</Text>
+                  </Row>
+                  <Pill size="sm" tone={p.similarity >= 0.95 ? "success" : "info"}>
+                    {(p.similarity * 100).toFixed(1)}%
+                  </Pill>
+                </Row>
+                <Text size="small" tone="secondary">
+                  Shared modal archetype:{" "}
+                  <Pill size="sm" tone={archetypeFamilyTone[p.sharedModal as ArchetypeFamily]}>
+                    {archetypeFamilyLabels[p.sharedModal as ArchetypeFamily]}
+                  </Pill>
+                </Text>
+              </Stack>
+            </CardBody>
+          </Card>
+        ))}
+      </Grid>
+    </Stack>
+  );
+};
+
+const IndustryDeepDives = (): JSX.Element => {
+  const top = industryMatrixSnapshot.industryRollup.slice(0, 8);
+  return (
+    <Grid columns={2} gap={12}>
+      {top.map((r) => {
+        const topFamilies = (Object.entries(r.archetypeShares) as [ArchetypeFamily, number][])
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 4)
+          .filter(([, s]) => s > 0);
+        return (
+          <Card key={`dd-${r.industry}`}>
+            <CardHeader>
+              {r.industry}
+              <Text as="span" size="small" tone="secondary" weight="regular">
+                {" "}· {r.orgCount.toLocaleString()} orgs
+              </Text>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={10}>
+                <Grid columns={3} gap={8}>
+                  <Stat value={r.medianSites.toLocaleString()} label="Median sites" />
+                  <Stat value={r.medianCameras.toLocaleString()} label="Median cameras" />
+                  <Stat value={`$${Math.round(r.medianBookings / 1000).toLocaleString()}K`} label="Median lifetime $" />
+                </Grid>
+                <Stack gap={4}>
+                  <Text size="small" weight="semibold">Archetype distribution</Text>
+                  {topFamilies.map(([f, s]) => (
+                    <Row key={`${r.industry}-${f}`} gap={8} align="center" justify="space-between">
+                      <Pill size="sm" tone={archetypeFamilyTone[f]}>
+                        {archetypeFamilyLabels[f]}
+                      </Pill>
+                      <Text size="small" tone="secondary">{fmtPct(s, 1)}</Text>
+                    </Row>
+                  ))}
+                </Stack>
+                <Stack gap={4}>
+                  <Text size="small" weight="semibold">Example orgs (top bookings, one per archetype)</Text>
+                  {r.examples.slice(0, 4).map((ex, i) => (
+                    <Row key={`${r.industry}-ex-${i}`} gap={8} align="center" justify="space-between" wrap>
+                      <Text size="small">{ex.orgName}</Text>
+                      <Row gap={6} align="center">
+                        <Pill size="sm" tone={archetypeFamilyTone[ex.archetype as ArchetypeFamily]}>
+                          {archetypeFamilyLabels[ex.archetype as ArchetypeFamily]}
+                        </Pill>
+                        <Text size="small" tone="secondary">
+                          {ex.totalSites.toLocaleString()} sites · {ex.cameras.toLocaleString()} cams
+                        </Text>
+                      </Row>
+                    </Row>
+                  ))}
+                </Stack>
+              </Stack>
+            </CardBody>
+          </Card>
+        );
+      })}
+    </Grid>
+  );
+};
+
+const IndustrySlide = ({ setView }: { setView: (v: View) => void }): JSX.Element => {
+  const rollup = industryMatrixSnapshot.industryRollup;
+  return (
+    <Stack gap={24}>
+      <Callout tone="info" title="You're viewing the industry analysis">
+        <Stack gap={10}>
+          <Text size="small">
+            Same {populationSnapshot.methodNumbers.totalActivePaid.toLocaleString()} active paid orgs, bucketed by SFDC industry (rolled
+            up to {rollup.length} verticals), size band (sites), bookings band
+            (lifetime $), and device-count band. Each cell shows the modal
+            archetype, the multi-archetype rate, and sample size. Cells under
+            N &lt; 30 are hidden.
+          </Text>
+          <Row gap={8} align="center">
+            <Button variant="secondary" onClick={() => setView("overview")}>
+              ← Back to overview
+            </Button>
+            <Button variant="secondary" onClick={() => setView("population")}>
+              Population analysis →
+            </Button>
+          </Row>
+        </Stack>
+      </Callout>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-headline">1. Does industry predict archetype?</H2>
+        <Text size="small" tone="secondary">
+          Headline numbers. Industry buckets ranked by org count.
+        </Text>
+        <IndustryHeadlineStats />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-rollup">2. Per-industry archetype distribution</H2>
+        <Text size="small" tone="secondary">
+          Modal archetype share answers “in this industry, what fraction of orgs
+          look the same?”. Entropy answers “how fragmented is the archetype mix
+          inside this industry?” — higher entropy means no dominant pattern.
+        </Text>
+        <IndustryRollupTable />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-matrix">3. Industry × size × bookings × device matrix</H2>
+        <Text size="small" tone="secondary">
+          The full four-dimensional cut. Each row is one cell of (industry, size
+          band, bookings band, device band) with its modal archetype and the
+          multi-archetype rate within the cell.
+        </Text>
+        <IndustryMatrixTable />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-similarity">4. Cross-industry similarity</H2>
+        <Text size="small" tone="secondary">
+          When two industries have similar archetype mixes, the same hierarchy
+          patterns work for both. High similarity + different industries means a
+          generalizable product surface; low similarity means each vertical
+          needs its own onboarding flow.
+        </Text>
+        <IndustrySimilarityCards />
+      </Stack>
+
+      <Divider />
+
+      <Stack gap={10}>
+        <H2 id="industry-deep-dives">5. Top-8 industry deep-dives</H2>
+        <Text size="small" tone="secondary">
+          One card per top industry by org count. Archetype distribution,
+          typical size and product mix, and one example org per archetype.
+        </Text>
+        <IndustryDeepDives />
+      </Stack>
+
+      <Divider />
+
+      <Callout tone="info" title="Want the population view?">
+        <Row gap={8} align="center">
+          <Button variant="primary" onClick={() => setView("population")}>
+            Open Population analysis →
+          </Button>
+          <Text size="small" tone="secondary">
+            Headline frequencies, root-shape coverage, archetype distribution,
+            single-product cohort, and the comparison cohort.
+          </Text>
+        </Row>
+      </Callout>
+    </Stack>
+  );
+};
+
 function MultiProductSiteHierarchyArchetypes(): JSX.Element {
   const [view, setView] = useCanvasState<View>("currentView", "overview");
   const [, setActiveRank] = useCanvasState<number>("activeCustomerRank", 1);
@@ -3618,6 +4501,12 @@ function MultiProductSiteHierarchyArchetypes(): JSX.Element {
       if (customerMatch) {
         targetView = "detail";
         targetCustomerRank = parseInt(customerMatch[1], 10);
+      } else if (POPULATION_HASHES.has(raw)) {
+        targetView = "population";
+      } else if (INDUSTRY_HASHES.has(raw)) {
+        targetView = "industry";
+      } else if (raw === "population-frequencies" || raw === "industry-patterns") {
+        targetView = "overview";
       } else if (OVERVIEW_HASHES.has(raw)) {
         targetView = "overview";
       } else if (DETAIL_HASHES.has(raw)) {
@@ -3643,8 +4532,12 @@ function MultiProductSiteHierarchyArchetypes(): JSX.Element {
       <Divider />
       {view === "overview" ? (
         <OverviewSlide setView={setView} />
-      ) : (
+      ) : view === "detail" ? (
         <DetailSlide setView={setView} />
+      ) : view === "population" ? (
+        <PopulationSlide setView={setView} />
+      ) : (
+        <IndustrySlide setView={setView} />
       )}
     </Stack>
   );

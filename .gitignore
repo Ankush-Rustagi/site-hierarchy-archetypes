@@ -5,3 +5,8 @@ dist
 .env
 .env.local
 .vite
+
+# Raw Athena extracts pulled from Hex; aggregated snapshots in src/data/*.json
+# are committed instead. Re-pull from the Hex thread in data-sources.md if
+# you need to rebuild.
+data/raw/*.csv
