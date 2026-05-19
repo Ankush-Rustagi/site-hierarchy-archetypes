@@ -3521,80 +3521,130 @@ const ArchetypeFamilyCards = (): JSX.Element => {
 
 type View = "overview" | "detail" | "aggregate";
 
+// PageHeader chrome that matches the canonical look used across the
+// portfolio (maps-2-0-nav-audit, the Ankush-Rustagi.github.io hub, etc.).
+// The page-specific narrative ("About this data", population context)
+// has moved into OverviewIntroBlock, rendered inside OverviewSlide so
+// the header itself stays scannable.
 const SharedHeader = (): JSX.Element => {
-  const totalSites = customers.reduce((a, c) => a + c.totalSites, 0);
-  const totalCams = customers.reduce((a, c) => a + c.cameras, 0);
-  const totalAC = customers.reduce((a, c) => a + c.acPanels, 0);
-  const totalAlarms = customers.reduce((a, c) => a + c.alarmDevices + c.alarmPanels, 0);
-
   const totals = aggregateSnapshot.totals;
   const tailBookingsB = (totals.complexTailBookings / 1_000_000_000).toFixed(2);
 
   return (
-    <Stack gap={16}>
-      <Stack gap={6}>
-        <H1>Multi-product site hierarchy archetypes</H1>
-        <Text tone="secondary">
+    <>
+      {/* Gradient hero behind the top 16rem. Matches the maps-2-0-nav-audit
+          treatment (radial + linear blend, dialed back to 30% opacity). */}
+      <div
+        aria-hidden
+        className="fixed inset-x-0 top-0 h-64 -z-10 opacity-30 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 70% at 20% 30%, oklch(0.55 0.18 230 / 0.85), transparent), radial-gradient(ellipse 70% 60% at 80% 70%, oklch(0.62 0.18 160 / 0.7), transparent), linear-gradient(135deg, oklch(0.25 0.05 230), oklch(0.22 0.08 180))",
+        }}
+      />
+
+      <a
+        href="https://ankush-rustagi.github.io/"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
+      >
+        <span aria-hidden>&larr;</span>
+        Back to index
+      </a>
+
+      <header className="mb-8">
+        <span className="inline-flex items-center rounded border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground mb-3">
+          Customer Dashboard
+        </span>
+
+        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight leading-tight mb-2 text-foreground">
+          Customer Site Hierarchy Atlas
+        </h1>
+
+        <p className="text-muted-foreground max-w-2xl leading-relaxed">
           How {totals.totalOrgs.toLocaleString()} active-paid Verkada accounts
           structure their Command site hierarchies, with a deep dive into the
-          {" "}
-          <Text as="span" weight="semibold">
-            complex tail
-          </Text>{" "}
-          of {totals.complexTailSize.toLocaleString()} customers
-          ({(totals.complexTailOrgShare * 100).toFixed(1)}% of accounts) that
-          drive ${tailBookingsB}B
+          complex tail of {totals.complexTailSize.toLocaleString()} customers
+          ({(totals.complexTailOrgShare * 100).toFixed(1)}% of accounts) driving
+          ${tailBookingsB}B
           ({(totals.complexTailBookingsShare * 100).toFixed(1)}%) of lifetime
-          bookings. Goal: understand how naming and depth correlate with
-          industry, scale, and product mix.
+          bookings.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/60 text-xs text-muted-foreground">
+          <span>
+            <span className="text-muted-foreground/50 mr-1">Created</span>
+            May 15, 2026
+          </span>
+          <span>
+            <span className="text-muted-foreground/50 mr-1">Updated</span>
+            May 18, 2026
+          </span>
+          <span>
+            <span className="font-semibold text-foreground">
+              {totals.totalOrgs.toLocaleString()}
+            </span>{" "}
+            <span className="text-muted-foreground/70">accounts audited</span>
+          </span>
+          <span>
+            <span className="font-semibold text-foreground">
+              {totals.complexTailSize.toLocaleString()}
+            </span>{" "}
+            <span className="text-muted-foreground/70">complex-tail orgs</span>
+          </span>
+          <span>
+            <span className="font-semibold text-foreground">
+              {(totals.complexTailBookingsShare * 100).toFixed(0)}%
+            </span>{" "}
+            <span className="text-muted-foreground/70">bookings concentration</span>
+          </span>
+          <span>
+            <span className="font-semibold text-foreground">12</span>{" "}
+            <span className="text-muted-foreground/70">deep-dive customers</span>
+          </span>
+        </div>
+      </header>
+    </>
+  );
+};
+
+// Population context + data-source callout. Used at the top of
+// OverviewSlide so first-time visitors get the framing without
+// crowding the page header.
+const OverviewIntroBlock = (): JSX.Element => {
+  const totalSites = customers.reduce((a, c) => a + c.totalSites, 0);
+  const totalCams = customers.reduce((a, c) => a + c.cameras, 0);
+  const totalAC = customers.reduce((a, c) => a + c.acPanels, 0);
+  const totalAlarms = customers.reduce(
+    (a, c) => a + c.alarmDevices + c.alarmPanels,
+    0,
+  );
+
+  return (
+    <Callout tone="neutral" title="About this data">
+      <Stack gap={6}>
+        <Text size="small" tone="secondary">
+          Athena via Hex, deduped to one row per Salesforce account (primary
+          org = the org with the most devices). Site and device counts mapped
+          through <Code>auth.directory_paths_latest</Code>; entity types{" "}
+          <Code>camera</Code>, <Code>accessController</Code>,{" "}
+          <Code>alarmsDevice</Code>, <Code>alarmSystem</Code>. The 12
+          hand-picked customers in the deep-dive view cover{" "}
+          {totalSites.toLocaleString()} sites,{" "}
+          {totalCams.toLocaleString()} cameras, and{" "}
+          {(totalAC + totalAlarms).toLocaleString()} AC + alarm devices.
+        </Text>
+        <Text size="small" tone="secondary">
+          Footnote (data coverage):{" "}
+          {taxonomySnapshot.unclassifiedTotals.orgs.toLocaleString()} accounts
+          ({(taxonomySnapshot.unclassifiedTotals.shareOfOrgs * 100).toFixed(1)}%
+          of the population, ~$
+          {(taxonomySnapshot.unclassifiedTotals.bookings / 1_000_000).toFixed(1)}M
+          lifetime bookings) have no Salesforce industry tag and are excluded
+          from the industry breakdown. They are still included in the
+          top-line population total.
         </Text>
       </Stack>
-
-      <Grid columns={4} gap={16}>
-        <Stat
-          value={totals.totalOrgs.toLocaleString()}
-          label="Active-paid accounts (deduped)"
-        />
-        <Stat
-          value={totals.complexTailSize.toLocaleString()}
-          label="Complex-tail orgs (focus of this study)"
-          tone="info"
-        />
-        <Stat
-          value={`${(totals.complexTailBookingsShare * 100).toFixed(0)}%`}
-          label="Lifetime bookings concentration in the tail"
-          tone="success"
-        />
-        <Stat value="12" label="Hand-picked customers for deep-dive" />
-      </Grid>
-
-      <Callout tone="neutral" title="About this data">
-        <Stack gap={6}>
-          <Text size="small" tone="secondary">
-            Athena via Hex, deduped to one row per Salesforce account (primary
-            org = the org with the most devices). Site and device counts mapped
-            through{" "}
-            <Code>auth.directory_paths_latest</Code>; entity types{" "}
-            <Code>camera</Code>, <Code>accessController</Code>,{" "}
-            <Code>alarmsDevice</Code>, <Code>alarmSystem</Code>. The 12
-            hand-picked customers in the deep-dive view cover{" "}
-            {totalSites.toLocaleString()} sites,{" "}
-            {totalCams.toLocaleString()} cameras, and{" "}
-            {(totalAC + totalAlarms).toLocaleString()} AC + alarm devices.
-          </Text>
-          <Text size="small" tone="secondary">
-            Footnote (data coverage):{" "}
-            {taxonomySnapshot.unclassifiedTotals.orgs.toLocaleString()}{" "}
-            accounts ({(taxonomySnapshot.unclassifiedTotals.shareOfOrgs * 100).toFixed(1)}%
-            of the population, ~$
-            {(taxonomySnapshot.unclassifiedTotals.bookings / 1_000_000).toFixed(1)}M
-            lifetime bookings) have no Salesforce industry tag and are excluded
-            from the industry breakdown. They are still included in the
-            top-line population total.
-          </Text>
-        </Stack>
-      </Callout>
-    </Stack>
+    </Callout>
   );
 };
 
@@ -3714,6 +3764,28 @@ function downloadCsv(): void {
   }
 }
 
+// Global pill-tab nav. Mirrors maps-2-0-nav-audit's top-of-page TABS
+// row: numbered pill labels + a one-line description below them.
+// The CSV download moves to a secondary control row underneath so the
+// nav itself stays uncluttered.
+const NAV_TABS: { id: View; label: string; sub: string }[] = [
+  {
+    id: "overview",
+    label: "1 \u00b7 Overview & Population",
+    sub: "Cross-cutting framing of the 31K-account population and the complex tail.",
+  },
+  {
+    id: "detail",
+    label: "2 \u00b7 Customer Deep-Dives",
+    sub: "Per-customer subtrees for the 12 most complex orgs in the population.",
+  },
+  {
+    id: "aggregate",
+    label: "3 \u00b7 Naming Patterns",
+    sub: "Population-wide naming and depth analysis across all complex-tail orgs.",
+  },
+];
+
 const ViewSwitcher = ({
   view,
   setView,
@@ -3721,85 +3793,60 @@ const ViewSwitcher = ({
   view: View;
   setView: (v: View) => void;
 }): JSX.Element => {
-  const theme = useHostTheme();
   const rowCount = buildCsvRows().length;
+  const current = NAV_TABS.find((t) => t.id === view);
+
   return (
-    <div
-      style={{
-        background: theme.fill.tertiary,
-        border: `2px solid ${theme.stroke.primary}`,
-        borderRadius: 8,
-        padding: 12,
-      }}
-    >
-      <Stack gap={8}>
-        <Row gap={10} align="center" justify="space-between" wrap>
-          <Row gap={10} align="center">
-            <Text size="small" weight="semibold" tone="secondary">
-              VIEW
-            </Text>
-            <Pill
-              size="md"
-              tone="info"
-              active={view === "overview"}
-              onClick={() => setView("overview")}
-              title={
-                view === "overview"
-                  ? "Overview & Population: currently selected"
-                  : "Switch to the cross-cutting overview and population framing"
+    <div className="mb-2">
+      <nav
+        className="flex flex-wrap gap-2"
+        aria-label="View selector"
+      >
+        {NAV_TABS.map((t) => {
+          const active = view === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setView(t.id)}
+              aria-pressed={active}
+              className={
+                "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors " +
+                (active
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border text-muted-foreground hover:border-foreground/50")
               }
-              leadingContent={view === "overview" ? <ActiveDot /> : null}
             >
-              Overview & Population
-            </Pill>
-            <Pill
-              size="md"
-              tone="info"
-              active={view === "detail"}
-              onClick={() => setView("detail")}
-              title={
-                view === "detail"
-                  ? "Customer Details: 12 Top Site Tree Complexity Orgs - currently selected"
-                  : "Switch to per-customer deep-dives for the 12 most complex orgs"
-              }
-              leadingContent={view === "detail" ? <ActiveDot /> : null}
-            >
-              Customer Details: 12 Top Site Tree Complexity Orgs
-            </Pill>
-            <Pill
-              size="md"
-              tone="info"
-              active={view === "aggregate"}
-              onClick={() => setView("aggregate")}
-              title={
-                view === "aggregate"
-                  ? "Global Site Node Naming: currently selected"
-                  : `Switch to the population-wide naming analysis (all 31K orgs, focus on the ~${(aggregateSnapshot.totals.complexTailSize / 1000).toFixed(1)}K complex tail holding ${(aggregateSnapshot.totals.complexTailBookingsShare * 100).toFixed(0)}% of bookings)`
-              }
-              leadingContent={view === "aggregate" ? <ActiveDot /> : null}
-            >
-              Global Site Node Naming
-            </Pill>
-          </Row>
-          <Row gap={10} align="center">
-            <Text size="small" tone="secondary">
-              {rowCount.toLocaleString()} nodes across 12 customers
-            </Text>
-            <Button
-              variant="secondary"
-              onClick={downloadCsv}
-              title="Download all 12 customers' emblematic site subtrees as a single CSV. Designed to feed into Cursor / Claude for generating Maps navigation mockups."
-            >
-              Download CSV ({rowCount.toLocaleString()} rows)
-            </Button>
-          </Row>
-        </Row>
-        <Text size="small" tone="secondary">
-          Click a pill to switch views. Selection persists across reloads. The CSV
-          includes node_id, parent_node_id, depth, full path, node type, product mix,
-          and per-product device counts for every node shown in the deep-dives.
-        </Text>
-      </Stack>
+              {t.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {current && (
+        <p className="mt-3 text-sm text-muted-foreground">{current.sub}</p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>
+          {rowCount.toLocaleString()} nodes across 12 customers
+        </span>
+        <span aria-hidden className="text-muted-foreground/40">
+          &middot;
+        </span>
+        <button
+          type="button"
+          onClick={downloadCsv}
+          title="Download all 12 customers' emblematic site subtrees as a single CSV. Designed to feed into Cursor / Claude for generating Maps navigation mockups."
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/60 px-3 py-1 text-xs font-medium text-foreground hover:border-foreground/40 transition-colors"
+        >
+          <span aria-hidden>&darr;</span>
+          Download CSV ({rowCount.toLocaleString()} rows)
+        </button>
+        <span className="text-muted-foreground/70">
+          Selection persists across reloads.
+        </span>
+      </div>
     </div>
   );
 };
@@ -3948,6 +3995,7 @@ const OverviewSlide = ({ setView }: { setView: (v: View) => void }): JSX.Element
   const simple = aggregateSnapshot.simpleBase.cameraOnlyFlat;
   return (
     <Stack gap={24}>
+      <OverviewIntroBlock />
       <Callout tone="success" title="TL;DR. The four numbers to remember.">
         <Stack gap={6}>
           <Text size="small">
@@ -6151,41 +6199,39 @@ function MultiProductSiteHierarchyArchetypes(): JSX.Element {
   }, [view]);
 
   return (
-    <Stack gap={20}>
+    <>
       <TooltipStyles />
       <SharedHeader />
       <ViewSwitcher view={view} setView={setView} />
-      <Divider />
-      {view === "overview" ? (
-        <OverviewSlide setView={setView} />
-      ) : view === "detail" ? (
-        <DetailSlide setView={setView} />
-      ) : (
-        <AggregateSlide setView={setView} />
-      )}
-    </Stack>
+      <div className="mt-6">
+        {view === "overview" ? (
+          <OverviewSlide setView={setView} />
+        ) : view === "detail" ? (
+          <DetailSlide setView={setView} />
+        ) : (
+          <AggregateSlide setView={setView} />
+        )}
+      </div>
+    </>
   );
 }
 
 export default function App(): JSX.Element {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0b1020",
-        color: "#e5e7eb",
-        padding: "32px 24px 64px",
-      }}
-    >
+    <div className="min-h-screen bg-background text-foreground">
       <a href="#main-content" className="vk-skip-link">
         Skip to main content
       </a>
       <main
         id="main-content"
         aria-label="Multi-product site hierarchy archetypes dashboard"
-        style={{ maxWidth: 1440, margin: "0 auto" }}
+        className="mx-auto max-w-7xl px-4 md:px-6 py-10"
       >
         <MultiProductSiteHierarchyArchetypes />
+        <footer className="mt-20 pt-6 border-t border-border text-xs text-muted-foreground">
+          Ankush Rustagi &middot; Verkada Product &middot; Multi-product site
+          hierarchy archetypes
+        </footer>
       </main>
     </div>
   );
