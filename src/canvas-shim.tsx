@@ -40,25 +40,25 @@ export type Theme = {
 const DARK_THEME: Theme = {
   kind: "dark",
   bg: {
-    default: "#0b1020",
-    elevated: "#111827",
-    subtle: "#1f2937",
-    chrome: "#0f172a",
+    default: "#141414",   // oklch(0.145 0 0)
+    elevated: "#2a2a2a",  // oklch(0.205 0 0)
+    subtle: "#3f3f3f",    // oklch(0.269 0 0)
+    chrome: "#0a0a0a",
   },
   fill: {
-    primary: "#1f2937",
-    secondary: "#111827",
-    tertiary: "#1a2235",
+    primary: "#3f3f3f",
+    secondary: "#2a2a2a",
+    tertiary: "#1f1f1f",
   },
   stroke: {
-    primary: "#4b5563",
-    secondary: "#374151",
-    tertiary: "#2d3748",
+    primary: "rgba(255,255,255,0.15)",
+    secondary: "rgba(255,255,255,0.10)",
+    tertiary: "rgba(255,255,255,0.06)",
   },
   text: {
-    primary: "#f9fafb",
-    secondary: "#cbd5e1",
-    tertiary: "#9ca3af",
+    primary: "#fafafa",   // oklch(0.985 0 0)
+    secondary: "#a3a3a3", // oklch(0.708 0 0)
+    tertiary: "#6d6d6d",  // oklch(0.556 0 0)
   },
 };
 
@@ -830,7 +830,7 @@ export function Table({
   // Background colors that pinned cells need to paint themselves with so
   // scrolled content does not show through. Match the row's zebra color.
   const evenRowBg = DARK_THEME.bg.elevated;
-  const oddRowBg = "#171f30"; // slightly lighter than evenRowBg, equivalent to rgba(148,163,184,0.04) atop bg.elevated
+  const oddRowBg = "#222222"; // slightly lighter than evenRowBg
   const headerBg = DARK_THEME.bg.subtle;
 
   return (
