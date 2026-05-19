@@ -40,25 +40,25 @@ export type Theme = {
 const DARK_THEME: Theme = {
   kind: "dark",
   bg: {
-    default: "#141414",   // oklch(0.145 0 0)
-    elevated: "#2a2a2a",  // oklch(0.205 0 0)
-    subtle: "#3f3f3f",    // oklch(0.269 0 0)
+    default: "#141414",   // oklch(0.145 0 0) — matches shadcn body background
+    elevated: "#111827",  // card / cell surfaces: keep subtle cool tint
+    subtle: "#1f2937",    // card headers, secondary surfaces
     chrome: "#0a0a0a",
   },
   fill: {
-    primary: "#3f3f3f",
-    secondary: "#2a2a2a",
-    tertiary: "#1f1f1f",
+    primary: "#1f2937",
+    secondary: "#111827",
+    tertiary: "#1a2235",
   },
   stroke: {
-    primary: "rgba(255,255,255,0.15)",
-    secondary: "rgba(255,255,255,0.10)",
-    tertiary: "rgba(255,255,255,0.06)",
+    primary: "#4b5563",
+    secondary: "#374151",
+    tertiary: "#2d3748",
   },
   text: {
-    primary: "#fafafa",   // oklch(0.985 0 0)
-    secondary: "#a3a3a3", // oklch(0.708 0 0)
-    tertiary: "#6d6d6d",  // oklch(0.556 0 0)
+    primary: "#f9fafb",
+    secondary: "#a3a3a3",  // neutral — was blue-tinted #cbd5e1
+    tertiary: "#6d6d6d",   // neutral — was blue-tinted #9ca3af
   },
 };
 
@@ -697,7 +697,7 @@ const CALLOUT_TONE: Record<
   NonNullable<CalloutProps["tone"]>,
   { bg: string; border: string; title: string }
 > = {
-  info: { bg: "#27272a40", border: "#71717a", title: "#d4d4d8" },
+  info: { bg: "#1e3a8a26", border: "#3b82f6", title: "#bfdbfe" },
   warning: { bg: "#78350f26", border: "#f59e0b", title: "#fde68a" },
   success: { bg: "#064e3b26", border: "#10b981", title: "#a7f3d0" },
   danger: { bg: "#7f1d1d26", border: "#ef4444", title: "#fecaca" },
@@ -830,7 +830,7 @@ export function Table({
   // Background colors that pinned cells need to paint themselves with so
   // scrolled content does not show through. Match the row's zebra color.
   const evenRowBg = DARK_THEME.bg.elevated;
-  const oddRowBg = "#222222"; // slightly lighter than evenRowBg
+  const oddRowBg = "#171f30"; // subtle blue-dark tint for row alternation
   const headerBg = DARK_THEME.bg.subtle;
 
   return (
